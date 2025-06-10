@@ -1,0 +1,36 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="PostgrePluginDemo"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.4", "Forward Plus")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/resizable=false
+window/stretch/mode="canvas_items"
+
+[dotnet]
+
+project/assembly_name="PostgrePluginDemo"
+
+[physics]
+
+common/enable_pause_aware_picking=true
+
+[rendering]
+
+renderer/rendering_method.mobile="forward_plus"
+textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.25, 0.25, 0.25, 1)
+environment/defaults/default_environment="res://default_env.tres"

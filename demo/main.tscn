@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://b5stpd248bn00"]
+
+[ext_resource type="Script" uid="uid://d1iy5y8roasp3" path="res://db_test.gd" id="1_test"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1_test")
+
+[node name="PostgreAdapter" type="PostgreAdapter" parent="."]
