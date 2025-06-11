@@ -38,18 +38,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, arm64]
+        arch: [x86_64]
         target: [template_debug, template_release]
-        exclude:
-          - target: template_debug
-            arch: arm64
         include:
           - arch: x86_64
             cc: gcc
             cxx: g++
-          - arch: arm64
-            cc: aarch64-linux-gnu-gcc
-            cxx: aarch64-linux-gnu-g++
     
     steps:
     - name: Checkout repository
@@ -78,9 +72,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y libpqxx-dev libpq-dev build-essential pkg-config
-        if [ "${{ matrix.arch }}" = "arm64" ]; then
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-        fi
         pip install scons
 
     - name: Build godot-cpp
@@ -204,7 +195,7 @@ jobs:
           if (-not (Test-Path $fullPath)) {
             Write-Warning "Required file not found: $fullPath"
           } else {
-            Write-Host "✓ Found: $file"
+            Write-Host "Found: $file"
           }
         }
 
@@ -341,7 +332,7 @@ jobs:
         echo "PostgreSQL GDExtension" > postgresql-gdextension/VERSION
         echo "Built on: $(date)" >> postgresql-gdextension/VERSION
         echo "Commit: ${{ github.sha }}" >> postgresql-gdextension/VERSION
-        echo "Platforms: Linux (x86_64, ARM64), Windows (x86_64), macOS (Universal)" >> postgresql-gdextension/VERSION
+        echo "Platforms: Linux (x86_64), Windows (x86_64), macOS (Universal)" >> postgresql-gdextension/VERSION
         
         # List package contents
         echo "Package contents:"
@@ -378,7 +369,7 @@ jobs:
           ## PostgreSQL GDExtension Release
           
           This release contains compiled binaries for all supported platforms:
-          - **Linux**: x86_64 and ARM64
+          - **Linux**: x86_64
           - **Windows**: x86_64  
           - **macOS**: Universal (Intel + Apple Silicon)
           
