@@ -1,0 +1,383 @@
+name: Build PostgreSQL GDExtension
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'Demo/**'
+      - '.gitignore'
+  pull_request:
+    branches: [ main, master ]
+    paths-ignore:
+      - '**.md'
+      - 'Demo/**'
+      - '.gitignore'
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+        - debug
+        - release
+        - both
+
+env:
+  GODOT_VERSION: "4.4"
+  SCONS_CACHE_SIZE: "7168"
+
+jobs:
+  build-linux:
+    name: Build Linux (${{ matrix.arch }}, ${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, arm64]
+        target: [template_debug, template_release]
+        exclude:
+          - target: template_debug
+            arch: arm64
+        include:
+          - arch: x86_64
+            cc: gcc
+            cxx: g++
+          - arch: arm64
+            cc: aarch64-linux-gnu-gcc
+            cxx: aarch64-linux-gnu-g++
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Set up cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/scons
+          godot-cpp/bin
+        key: linux-${{ matrix.arch }}-${{ matrix.target }}-${{ hashFiles('SConstruct', 'godot-cpp/**') }}
+        restore-keys: |
+          linux-${{ matrix.arch }}-${{ matrix.target }}-
+          linux-${{ matrix.arch }}-
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libpqxx-dev libpq-dev build-essential pkg-config
+        if [ "${{ matrix.arch }}" = "arm64" ]; then
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+        fi
+        pip install scons
+
+    - name: Build godot-cpp
+      run: |
+        cd godot-cpp
+        scons platform=linux target=${{ matrix.target }} arch=${{ matrix.arch }} \
+              CC=${{ matrix.cc }} CXX=${{ matrix.cxx }} \
+              -j$(nproc) --cache-dir=~/.cache/scons
+
+    - name: Build extension
+      run: |
+        scons platform=linux target=${{ matrix.target }} arch=${{ matrix.arch }} \
+              CC=${{ matrix.cc }} CXX=${{ matrix.cxx }} \
+              -j$(nproc) --cache-dir=~/.cache/scons
+
+    - name: List build outputs
+      run: |
+        echo "Build outputs:"
+        ls -la demo/bin/
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-${{ matrix.arch }}-${{ matrix.target }}
+        path: |
+          demo/bin/libpostgreadapter.linux.*.so
+          demo/postgreadapter.gdextension
+        retention-days: 7
+
+  build-windows:
+    name: Build Windows (${{ matrix.arch }}, ${{ matrix.target }})
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64]
+        target: [template_debug, template_release]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Set up MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+
+    - name: Set up cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/scons
+          godot-cpp/bin
+        key: windows-${{ matrix.arch }}-${{ matrix.target }}-${{ hashFiles('SConstruct', 'godot-cpp/**') }}
+        restore-keys: |
+          windows-${{ matrix.arch }}-${{ matrix.target }}-
+          windows-${{ matrix.arch }}-
+
+    - name: Install SCons
+      run: pip install scons
+
+    - name: Install PostgreSQL
+      shell: powershell
+      run: |
+        $url = "https://get.enterprisedb.com/postgresql/postgresql-16.1-1-windows-x64-binaries.zip"
+        Write-Host "Downloading PostgreSQL..."
+        Invoke-WebRequest -Uri $url -OutFile postgresql.zip -MaximumRetryCount 3
+        Write-Host "Extracting PostgreSQL..."
+        Expand-Archive postgresql.zip -DestinationPath . -Force
+        $env:POSTGRESQL_PATH = "$PWD\pgsql"
+        echo "POSTGRESQL_PATH=$env:POSTGRESQL_PATH" >> $env:GITHUB_ENV
+        Write-Host "PostgreSQL installed at: $env:POSTGRESQL_PATH"
+
+    - name: Build godot-cpp
+      shell: cmd
+      run: |
+        cd godot-cpp
+        scons platform=windows target=${{ matrix.target }} arch=${{ matrix.arch }} -j%NUMBER_OF_PROCESSORS%
+
+    - name: Build extension
+      shell: cmd
+      run: |
+        scons platform=windows target=${{ matrix.target }} arch=${{ matrix.arch }} -j%NUMBER_OF_PROCESSORS%
+
+    - name: List build outputs
+      shell: powershell
+      run: |
+        Write-Host "Build outputs:"
+        Get-ChildItem demo/bin/ -Recurse
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-${{ matrix.arch }}-${{ matrix.target }}
+        path: |
+          demo/bin/libpostgreadapter.windows.*.dll
+          demo/postgreadapter.gdextension
+        retention-days: 7
+
+  build-macos:
+    name: Build macOS (${{ matrix.arch }}, ${{ matrix.target }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [universal]
+        target: [template_debug, template_release]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Set up cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/scons
+          godot-cpp/bin
+        key: macos-${{ matrix.arch }}-${{ matrix.target }}-${{ hashFiles('SConstruct', 'godot-cpp/**') }}
+        restore-keys: |
+          macos-${{ matrix.arch }}-${{ matrix.target }}-
+          macos-${{ matrix.arch }}-
+
+    - name: Install dependencies
+      run: |
+        brew install libpqxx postgresql pkg-config
+        pip install scons
+
+    - name: Build godot-cpp
+      run: |
+        cd godot-cpp
+        scons platform=macos target=${{ matrix.target }} arch=${{ matrix.arch }} \
+              -j$(sysctl -n hw.ncpu) --cache-dir=~/.cache/scons
+
+    - name: Build extension
+      run: |
+        scons platform=macos target=${{ matrix.target }} arch=${{ matrix.arch }} \
+              -j$(sysctl -n hw.ncpu) --cache-dir=~/.cache/scons
+
+    - name: List build outputs
+      run: |
+        echo "Build outputs:"
+        ls -la demo/bin/
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-${{ matrix.arch }}-${{ matrix.target }}
+        path: |
+          demo/bin/libpostgreadapter.macos.*.framework
+          demo/postgreadapter.gdextension
+        retention-days: 7
+
+  package-artifacts:
+    name: Package Release Artifacts
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: always() && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Display artifact structure
+      run: |
+        echo "Downloaded artifacts:"
+        find artifacts -type f -ls
+
+    - name: Create release package
+      run: |
+        mkdir -p postgresql-gdextension/{bin,demo,docs}
+        
+        # Copy binaries from artifacts
+        find artifacts -name "*.so" -exec cp {} postgresql-gdextension/bin/ \; 2>/dev/null || true
+        find artifacts -name "*.dll" -exec cp {} postgresql-gdextension/bin/ \; 2>/dev/null || true
+        find artifacts -name "*.framework" -exec cp -r {} postgresql-gdextension/bin/ \; 2>/dev/null || true
+        
+        # Copy configuration files
+        find artifacts -name "*.gdextension" -exec cp {} postgresql-gdextension/ \; 2>/dev/null || true
+        
+        # Copy documentation
+        cp README.md BUILD.md postgresql-gdextension/docs/ 2>/dev/null || true
+        cp Demo/README.md postgresql-gdextension/docs/DEMO.md 2>/dev/null || true
+        
+        # Copy demo files
+        cp -r Demo postgresql-gdextension/demo/ 2>/dev/null || true
+        
+        # Create version info
+        echo "PostgreSQL GDExtension" > postgresql-gdextension/VERSION
+        echo "Built on: $(date)" >> postgresql-gdextension/VERSION
+        echo "Commit: ${{ github.sha }}" >> postgresql-gdextension/VERSION
+        echo "Platforms: Linux (x86_64, ARM64), Windows (x86_64), macOS (Universal)" >> postgresql-gdextension/VERSION
+        
+        # List package contents
+        echo "Package contents:"
+        find postgresql-gdextension -type f -ls
+        
+        # Create archives
+        tar -czf postgresql-gdextension.tar.gz postgresql-gdextension/
+        zip -r postgresql-gdextension.zip postgresql-gdextension/
+
+    - name: Generate checksums
+      run: |
+        sha256sum postgresql-gdextension.tar.gz > postgresql-gdextension.tar.gz.sha256
+        sha256sum postgresql-gdextension.zip > postgresql-gdextension.zip.sha256
+
+    - name: Upload package artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: postgresql-gdextension-package
+        path: |
+          postgresql-gdextension.tar.gz
+          postgresql-gdextension.zip
+          *.sha256
+        retention-days: 30
+
+    - name: Upload to release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          postgresql-gdextension.tar.gz
+          postgresql-gdextension.zip
+          *.sha256
+        body: |
+          ## PostgreSQL GDExtension Release
+          
+          This release contains compiled binaries for all supported platforms:
+          - **Linux**: x86_64 and ARM64
+          - **Windows**: x86_64  
+          - **macOS**: Universal (Intel + Apple Silicon)
+          
+          ### Installation
+          1. Download the appropriate archive
+          2. Extract to your Godot project
+          3. Add the PostgreAdapter node to your scene
+          4. Configure connection string and enjoy!
+          
+          ### Checksums
+          Verify downloads using the provided `.sha256` files.
+          
+          Built from commit: ${{ github.sha }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test-builds:
+    name: Test Build Artifacts
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: github.event_name != 'release'
+    
+    steps:
+    - name: Download Linux artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: linux-*
+        merge-multiple: true
+
+    - name: Test Linux binaries
+      run: |
+        echo "Testing Linux binaries..."
+        for lib in *.so; do
+          if [ -f "$lib" ]; then
+            echo "Checking $lib:"
+            file "$lib"
+            ldd "$lib" || true
+            echo "Size: $(du -h "$lib" | cut -f1)"
+            echo "---"
+          fi
+        done
+
+    - name: Verify GDExtension config
+      run: |
+        if [ -f "postgreadapter.gdextension" ]; then
+          echo "GDExtension configuration found:"
+          cat postgreadapter.gdextension
+        else
+          echo "WARNING: GDExtension configuration not found!"
+        fi

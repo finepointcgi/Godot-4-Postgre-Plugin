@@ -221,7 +221,7 @@ func _on_async_non_query_completed(affected_rows: int):
 	async_queries_completed += 1
 
 func _on_async_query_failed(query: String, error: String):
-	print("❌ Async query failed: ", query, " Error: ", error)
+	print("Async query failed: ", query, " Error: ", error)
 	async_queries_completed += 1
 
 # Signal handlers for transactions
@@ -229,10 +229,10 @@ func _on_transaction_started():
 	print("🔄 Transaction started successfully!")
 
 func _on_transaction_committed():
-	print("✅ Transaction committed successfully!")
+	print("Transaction committed successfully!")
 
 func _on_transaction_rolled_back():
 	print("🔄 Transaction rolled back successfully!")
 
 func _on_transaction_failed(error: String):
-	print("❌ Transaction failed: ", error)
+	print("Transaction failed: ", error)

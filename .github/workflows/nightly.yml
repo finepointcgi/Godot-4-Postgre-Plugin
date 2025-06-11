@@ -1,0 +1,85 @@
+name: Nightly Builds
+
+on:
+  schedule:
+    # Run at 2 AM UTC every day
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.4"
+
+jobs:
+  nightly-build:
+    name: Nightly Build (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-latest
+            arch: x86_64
+          - platform: windows  
+            os: windows-2022
+            arch: x86_64
+          - platform: macos
+            os: macos-latest
+            arch: universal
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies (Linux)
+      if: matrix.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libpqxx-dev libpq-dev build-essential pkg-config
+        pip install scons
+
+    - name: Install dependencies (Windows)
+      if: matrix.platform == 'windows'
+      shell: powershell
+      run: |
+        pip install scons
+        # Download and install PostgreSQL
+        $url = "https://get.enterprisedb.com/postgresql/postgresql-16.1-1-windows-x64-binaries.zip"
+        Invoke-WebRequest -Uri $url -OutFile postgresql.zip
+        Expand-Archive postgresql.zip -DestinationPath .
+        echo "POSTGRESQL_PATH=$PWD\pgsql" >> $env:GITHUB_ENV
+
+    - name: Install dependencies (macOS)
+      if: matrix.platform == 'macos'
+      run: |
+        brew install libpqxx postgresql
+        pip install scons
+
+    - name: Setup MSVC (Windows)
+      if: matrix.platform == 'windows'
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Build extension
+      run: |
+        ./build_scripts/build_${{ matrix.platform }}.sh
+      shell: bash
+
+    - name: Create nightly package
+      run: |
+        mkdir -p nightly-${{ matrix.platform }}
+        cp -r demo/bin/* nightly-${{ matrix.platform }}/
+        tar -czf nightly-${{ matrix.platform }}-$(date +%Y%m%d).tar.gz nightly-${{ matrix.platform }}/
+
+    - name: Upload nightly build
+      uses: actions/upload-artifact@v4
+      with:
+        name: nightly-${{ matrix.platform }}-${{ github.run_number }}
+        path: nightly-${{ matrix.platform }}-*.tar.gz
+        retention-days: 7
