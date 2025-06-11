@@ -155,12 +155,54 @@ jobs:
       run: |
         $url = "https://get.enterprisedb.com/postgresql/postgresql-16.1-1-windows-x64-binaries.zip"
         Write-Host "Downloading PostgreSQL..."
-        Invoke-WebRequest -Uri $url -OutFile postgresql.zip -MaximumRetryCount 3
+        
+        # Download with retry logic
+        $maxRetries = 3
+        $retryCount = 0
+        $downloaded = $false
+        
+        while (-not $downloaded -and $retryCount -lt $maxRetries) {
+          try {
+            Invoke-WebRequest -Uri $url -OutFile postgresql.zip -UseBasicParsing
+            $downloaded = $true
+            Write-Host "Download successful"
+          }
+          catch {
+            $retryCount++
+            Write-Host "Download attempt $retryCount failed: $($_.Exception.Message)"
+            if ($retryCount -lt $maxRetries) {
+              Write-Host "Retrying in 5 seconds..."
+              Start-Sleep -Seconds 5
+            }
+          }
+        }
+        
+        if (-not $downloaded) {
+          throw "Failed to download PostgreSQL after $maxRetries attempts"
+        }
+        
         Write-Host "Extracting PostgreSQL..."
         Expand-Archive postgresql.zip -DestinationPath . -Force
+        
+        # Verify extraction
+        if (-not (Test-Path "pgsql")) {
+          throw "PostgreSQL extraction failed - pgsql directory not found"
+        }
+        
         $env:POSTGRESQL_PATH = "$PWD\pgsql"
         echo "POSTGRESQL_PATH=$env:POSTGRESQL_PATH" >> $env:GITHUB_ENV
         Write-Host "PostgreSQL installed at: $env:POSTGRESQL_PATH"
+        
+        # Verify required files exist
+        $requiredFiles = @("include\libpq-fe.h", "lib\libpq.lib", "bin\libpq.dll")
+        foreach ($file in $requiredFiles) {
+          $fullPath = Join-Path $env:POSTGRESQL_PATH $file
+          if (-not (Test-Path $fullPath)) {
+            Write-Warning "Required file not found: $fullPath"
+          } else {
+            Write-Host "✓ Found: $file"
+          }
+        }
 
     - name: Build godot-cpp
       shell: cmd
