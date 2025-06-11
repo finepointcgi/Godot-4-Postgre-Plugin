@@ -1,0 +1,45 @@
+# Build artifacts
+*.os
+*.o
+*.a
+*.dylib
+*.so
+*.dll
+*.lib
+*.framework
+
+# SCons build files
+.sconsign.dblite
+build/
+
+# Godot build artifacts
+godot-cpp/bin/
+demo/bin/
+Demo/bin/
+
+# Framework builds (macOS)
+*.framework/
+**/*.framework/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Dependencies (if you choose to include them, comment these out)
+# godot-cpp/
+
+# Demo specific
+Demo/.godot/
+Demo/.import/
