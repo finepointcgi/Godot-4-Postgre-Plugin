@@ -1,8 +1,16 @@
 #!/usr/bin/env python
 import os
 import sys
+os.environ['GODOT_CPP_PATH'] = '/Users/finepointcgi/Documents/GitHub/PostgrePlugin/godot-cpp'
 
 env = SConscript("godot-cpp/SConstruct")
+env.Append(CPPPATH=[
+    os.environ['GODOT_CPP_PATH'] + "/include",
+    os.environ['GODOT_CPP_PATH'] + "/gen/include",
+    "/opt/homebrew/opt/libpqxx/include"
+])
+env.Append(LIBPATH=["/opt/homebrew/opt/libpqxx/lib", "/opt/homebrew/opt/libpq/lib"])
+env.Append(LIBS=["pqxx", "pq"]) # Link against libpqxx and libpq
 
 # For reference:
 # - CCFLAGS are compilation flags shared between C and C++
@@ -18,11 +26,6 @@ sources = Glob("src/*.cpp")
 
 # Enable C++ exceptions
 env.Append(CXXFLAGS=['-fexceptions'])
-
-# Add libpqxx include and library paths
-env.Append(CPPPATH=["/opt/homebrew/opt/libpqxx/include"])
-env.Append(LIBPATH=["/opt/homebrew/opt/libpqxx/lib", "/opt/homebrew/opt/libpq/lib"])
-env.Append(LIBS=["pqxx", "pq"]) # Link against libpqxx and libpq
 
 if env["platform"] == "macos":
     library = env.SharedLibrary(
