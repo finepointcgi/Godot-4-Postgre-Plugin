@@ -86,15 +86,19 @@ jobs:
     - name: Build godot-cpp
       run: |
         cd godot-cpp
+        export CC=${{ matrix.cc }}
+        export CXX=${{ matrix.cxx }}
+        export SCONS_CACHE=~/.cache/scons
         scons platform=linux target=${{ matrix.target }} arch=${{ matrix.arch }} \
-              CC=${{ matrix.cc }} CXX=${{ matrix.cxx }} \
-              -j$(nproc) --cache-dir=~/.cache/scons
+              -j$(nproc)
 
     - name: Build extension
       run: |
+        export CC=${{ matrix.cc }}
+        export CXX=${{ matrix.cxx }}
+        export SCONS_CACHE=~/.cache/scons
         scons platform=linux target=${{ matrix.target }} arch=${{ matrix.arch }} \
-              CC=${{ matrix.cc }} CXX=${{ matrix.cxx }} \
-              -j$(nproc) --cache-dir=~/.cache/scons
+              -j$(nproc)
 
     - name: List build outputs
       run: |
@@ -270,13 +274,15 @@ jobs:
     - name: Build godot-cpp
       run: |
         cd godot-cpp
+        export SCONS_CACHE=~/.cache/scons
         scons platform=macos target=${{ matrix.target }} arch=${{ matrix.arch }} \
-              -j$(sysctl -n hw.ncpu) --cache-dir=~/.cache/scons
+              -j$(sysctl -n hw.ncpu)
 
     - name: Build extension
       run: |
+        export SCONS_CACHE=~/.cache/scons
         scons platform=macos target=${{ matrix.target }} arch=${{ matrix.arch }} \
-              -j$(sysctl -n hw.ncpu) --cache-dir=~/.cache/scons
+              -j$(sysctl -n hw.ncpu)
 
     - name: List build outputs
       run: |
