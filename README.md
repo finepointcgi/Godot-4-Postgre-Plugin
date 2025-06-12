@@ -1,14 +1,14 @@
 # PostgreSQL GDExtension for Godot
 
-[![Build Status](https://github.com/yourusername/PostgrePlugin/workflows/Build%20PostgreSQL%20GDExtension/badge.svg)](https://github.com/yourusername/PostgrePlugin/actions/workflows/build.yml)
-[![Tests](https://github.com/yourusername/PostgrePlugin/workflows/Test%20PostgreSQL%20Extension/badge.svg)](https://github.com/yourusername/PostgrePlugin/actions/workflows/test.yml)
-[![Nightly](https://github.com/yourusername/PostgrePlugin/workflows/Nightly%20Builds/badge.svg)](https://github.com/yourusername/PostgrePlugin/actions/workflows/nightly.yml)
+[![Build Status](https://github.com/finepointcgi/PostgrePlugin/workflows/Build%20PostgreSQL%20GDExtension/badge.svg)](https://github.com/finepointcgi/PostgrePlugin/actions/workflows/build.yml)
+[![Tests](https://github.com/finepointcgi/PostgrePlugin/workflows/Test%20PostgreSQL%20Extension/badge.svg)](https://github.com/finepointcgi/PostgrePlugin/actions/workflows/test.yml)
+[![Nightly](https://github.com/finepointcgi/PostgrePlugin/workflows/Nightly%20Builds/badge.svg)](https://github.com/finepointcgi/PostgrePlugin/actions/workflows/nightly.yml)
 
 A PostgreSQL database adapter for Godot 4, implemented as a native GDExtension using C++ and libpqxx. This plugin allows PostgreSQL database connections with features like connection pooling, transaction management, and asynchronous operations.
 
 ## 📦 Pre-built Binaries
 
-Download ready-to-use binaries for all platforms from the [Releases](https://github.com/yourusername/PostgrePlugin/releases) page:
+Download ready-to-use binaries for all platforms from the [Releases](https://github.com/finepointcgi/PostgrePlugin/releases) page:
 - **Linux**: x86_64 and ARM64
 - **Windows**: x86_64
 - **macOS**: Universal (Intel + Apple Silicon)
