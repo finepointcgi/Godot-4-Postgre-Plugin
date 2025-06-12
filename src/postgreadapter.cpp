@@ -224,12 +224,21 @@ Array PostgreAdapter::execute_query(const String &p_query, const Array& p_params
                     }
                 }
                 
-                // Use pqxx::params for parameter binding
-                pqxx::params p;
-                for (const auto& param : params_vec) {
-                    p.append(param);
+                // Use exec_params for parameter binding
+                if (params_vec.size() == 1) {
+                    R = W.exec_params(p_query.utf8().get_data(), params_vec[0]);
+                } else if (params_vec.size() == 2) {
+                    R = W.exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1]);
+                } else if (params_vec.size() == 3) {
+                    R = W.exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1], params_vec[2]);
+                } else if (params_vec.size() == 4) {
+                    R = W.exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1], params_vec[2], params_vec[3]);
+                } else if (params_vec.size() == 5) {
+                    R = W.exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1], params_vec[2], params_vec[3], params_vec[4]);
+                } else {
+                    UtilityFunctions::print("Error: Too many parameters (max 5 supported)");
+                    return Array();
                 }
-                R = W.exec(p_query.utf8().get_data(), p);
             } else {
                 R = W.exec(p_query.utf8().get_data());
             }
@@ -327,12 +336,22 @@ int PostgreAdapter::execute_non_query(const String &p_query, const Array& p_para
 			                     return -1;
 			                 }
 			             }
-			             // Use pqxx::params for parameter binding
-			             pqxx::params p;
-			             for (const auto& param : params_vec) {
-			                 p.append(param);
+			             // Use exec_params for parameter binding
+			             if (params_vec.size() == 1) {
+			                 R = W.exec_params(p_query.utf8().get_data(), params_vec[0]);
+			             } else if (params_vec.size() == 2) {
+			                 R = W.exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1]);
+			             } else if (params_vec.size() == 3) {
+			                 R = W.exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1], params_vec[2]);
+			             } else if (params_vec.size() == 4) {
+			                 R = W.exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1], params_vec[2], params_vec[3]);
+			             } else if (params_vec.size() == 5) {
+			                 R = W.exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1], params_vec[2], params_vec[3], params_vec[4]);
+			             } else {
+			                 UtilityFunctions::print("Error: Too many parameters (max 5 supported)");
+			                 connection_pool->release(conn);
+			                 return -1;
 			             }
-			             R = W.exec(p_query.utf8().get_data(), p);
 			         } else {
 			             R = W.exec(p_query.utf8().get_data());
 			         }
@@ -528,12 +547,21 @@ Array PostgreAdapter::execute_query_in_transaction(const String &p_query, const 
 					params_vec.push_back("(" + std::to_string(v.x) + "," + std::to_string(v.y) + "," + std::to_string(v.z) + ")");
 				}
 			}
-			// Use pqxx::params for parameter binding
-			pqxx::params p;
-			for (const auto& param : params_vec) {
-				p.append(param);
+			// Use exec_params for parameter binding
+			if (params_vec.size() == 1) {
+				R = current_transaction->exec_params(p_query.utf8().get_data(), params_vec[0]);
+			} else if (params_vec.size() == 2) {
+				R = current_transaction->exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1]);
+			} else if (params_vec.size() == 3) {
+				R = current_transaction->exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1], params_vec[2]);
+			} else if (params_vec.size() == 4) {
+				R = current_transaction->exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1], params_vec[2], params_vec[3]);
+			} else if (params_vec.size() == 5) {
+				R = current_transaction->exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1], params_vec[2], params_vec[3], params_vec[4]);
+			} else {
+				UtilityFunctions::print("Error: Too many parameters (max 5 supported)");
+				return Array();
 			}
-			R = current_transaction->exec(p_query.utf8().get_data(), p);
 		} else {
 			R = current_transaction->exec(p_query.utf8().get_data());
 		}
@@ -590,12 +618,21 @@ int PostgreAdapter::execute_non_query_in_transaction(const String &p_query, cons
 					params_vec.push_back("(" + std::to_string(v.x) + "," + std::to_string(v.y) + "," + std::to_string(v.z) + ")");
 				}
 			}
-			// Use pqxx::params for parameter binding
-			pqxx::params p;
-			for (const auto& param : params_vec) {
-				p.append(param);
+			// Use exec_params for parameter binding
+			if (params_vec.size() == 1) {
+				R = current_transaction->exec_params(p_query.utf8().get_data(), params_vec[0]);
+			} else if (params_vec.size() == 2) {
+				R = current_transaction->exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1]);
+			} else if (params_vec.size() == 3) {
+				R = current_transaction->exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1], params_vec[2]);
+			} else if (params_vec.size() == 4) {
+				R = current_transaction->exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1], params_vec[2], params_vec[3]);
+			} else if (params_vec.size() == 5) {
+				R = current_transaction->exec_params(p_query.utf8().get_data(), params_vec[0], params_vec[1], params_vec[2], params_vec[3], params_vec[4]);
+			} else {
+				UtilityFunctions::print("Error: Too many parameters (max 5 supported)");
+				return -1;
 			}
-			R = current_transaction->exec(p_query.utf8().get_data(), p);
 		} else {
 			R = current_transaction->exec(p_query.utf8().get_data());
 		}
