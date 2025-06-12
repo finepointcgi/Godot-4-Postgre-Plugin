@@ -145,53 +145,34 @@ jobs:
     - name: Install SCons
       run: pip install scons
 
-    - name: Install PostgreSQL
+    - name: Install PostgreSQL and libpqxx
       shell: powershell
       run: |
-        $url = "https://get.enterprisedb.com/postgresql/postgresql-16.1-1-windows-x64-binaries.zip"
-        Write-Host "Downloading PostgreSQL..."
+        # Install vcpkg
+        Write-Host "Installing vcpkg..."
+        git clone https://github.com/Microsoft/vcpkg.git
+        cd vcpkg
+        .\bootstrap-vcpkg.bat
+        .\vcpkg integrate install
         
-        # Download with retry logic
-        $maxRetries = 3
-        $retryCount = 0
-        $downloaded = $false
+        # Install libpqxx which includes PostgreSQL
+        Write-Host "Installing libpqxx..."
+        .\vcpkg install libpqxx:x64-windows
         
-        while (-not $downloaded -and $retryCount -lt $maxRetries) {
-          try {
-            Invoke-WebRequest -Uri $url -OutFile postgresql.zip -UseBasicParsing
-            $downloaded = $true
-            Write-Host "Download successful"
-          }
-          catch {
-            $retryCount++
-            Write-Host "Download attempt $retryCount failed: $($_.Exception.Message)"
-            if ($retryCount -lt $maxRetries) {
-              Write-Host "Retrying in 5 seconds..."
-              Start-Sleep -Seconds 5
-            }
-          }
-        }
+        # Set environment variables
+        $vcpkgRoot = "$PWD"
+        $libpqxxPath = "$vcpkgRoot\installed\x64-windows"
         
-        if (-not $downloaded) {
-          throw "Failed to download PostgreSQL after $maxRetries attempts"
-        }
+        echo "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV
+        echo "POSTGRESQL_PATH=$libpqxxPath" >> $env:GITHUB_ENV
         
-        Write-Host "Extracting PostgreSQL..."
-        Expand-Archive postgresql.zip -DestinationPath . -Force
+        Write-Host "vcpkg root: $vcpkgRoot"
+        Write-Host "libpqxx installed at: $libpqxxPath"
         
-        # Verify extraction
-        if (-not (Test-Path "pgsql")) {
-          throw "PostgreSQL extraction failed - pgsql directory not found"
-        }
-        
-        $env:POSTGRESQL_PATH = "$PWD\pgsql"
-        echo "POSTGRESQL_PATH=$env:POSTGRESQL_PATH" >> $env:GITHUB_ENV
-        Write-Host "PostgreSQL installed at: $env:POSTGRESQL_PATH"
-        
-        # Verify required files exist
-        $requiredFiles = @("include\libpq-fe.h", "lib\libpq.lib", "bin\libpq.dll")
+        # Verify installation
+        $requiredFiles = @("include\pqxx\pqxx", "include\libpq-fe.h", "lib\pqxx.lib", "lib\libpq.lib")
         foreach ($file in $requiredFiles) {
-          $fullPath = Join-Path $env:POSTGRESQL_PATH $file
+          $fullPath = Join-Path $libpqxxPath $file
           if (-not (Test-Path $fullPath)) {
             Write-Warning "Required file not found: $fullPath"
           } else {

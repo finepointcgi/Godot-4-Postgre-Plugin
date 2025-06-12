@@ -52,17 +52,25 @@ def configure_postgresql_libs(env):
             env.Append(LIBPATH=["/usr/lib/x86_64-linux-gnu", "/usr/lib"])
             
     elif platform == "windows":
-        # Windows - assume PostgreSQL installed in standard location
+        # Windows - use vcpkg installed libraries
         pg_path = os.environ.get("POSTGRESQL_PATH", "C:\\Program Files\\PostgreSQL\\16")
+        vcpkg_root = os.environ.get("VCPKG_ROOT", "")
+        
+        print("PostgreSQL path: {}".format(pg_path))
+        print("vcpkg root: {}".format(vcpkg_root))
         
         env.Append(CPPPATH=[
-            os.path.join(pg_path, "include"),
-            os.path.join(pg_path, "include", "libpqxx")
+            os.path.join(pg_path, "include")
         ])
         env.Append(LIBPATH=[os.path.join(pg_path, "lib")])
         
-        # Windows library names
-        env.Append(LIBS=["libpqxx", "libpq", "ws2_32", "advapi32"])
+        # Use vcpkg toolchain if available
+        if vcpkg_root:
+            env.Append(CPPPATH=[os.path.join(vcpkg_root, "installed", "x64-windows", "include")])
+            env.Append(LIBPATH=[os.path.join(vcpkg_root, "installed", "x64-windows", "lib")])
+        
+        # Windows library names for libpqxx and libpq
+        env.Append(LIBS=["pqxx", "libpq", "ws2_32", "advapi32"])
         return  # Skip the common libs addition below
     
     # Common library names for Unix-like systems
@@ -84,7 +92,12 @@ env.Append(CPPPATH=["src/"])
 sources = Glob("src/*.cpp")
 
 # Enable C++ exceptions
-env.Append(CXXFLAGS=['-fexceptions'])
+if env["platform"] == "windows":
+    # MSVC uses /EHsc for exception handling
+    env.Append(CXXFLAGS=['/EHsc'])
+else:
+    # GCC/Clang use -fexceptions
+    env.Append(CXXFLAGS=['-fexceptions'])
 
 if env["platform"] == "macos":
     library = env.SharedLibrary(
