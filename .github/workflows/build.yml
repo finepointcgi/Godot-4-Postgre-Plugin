@@ -26,6 +26,8 @@ on:
         - debug
         - release
         - both
+    tags:
+    - 'godot--cpp-*'
 
 env:
   GODOT_VERSION: "4.4"
