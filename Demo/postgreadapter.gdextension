@@ -1,12 +1,12 @@
 [configuration]
 
-entry_symbol = "postgreadapter_library_init"
+entry_symbol = "postgreAdapter_library_init"
 compatibility_minimum = "4.4"
 
 [libraries]
 
-macos.debug = "bin/PostgreAdapter/libpostgreadapter.macos.template_debug"
-macos.release = "bin/PostgreAdapter/libpostgreadapter.macos.template_release"
+macos.debug = "bin/PostgreAdapter/libpostgreadapter.macos.template_debug.framework/libpostgreadapter.macos.template_debug"
+macos.release = "bin/PostgreAdapter/libpostgreadapter.macos.template_release.framework/libpostgreadapter.macos.template_release"
 
 windows.debug.x86_64 = "bin/PostgreAdapter/libpostgreadapter.windows.template_debug.x86_64.dll"
 windows.release.x86_64 = "bin/PostgreAdapter/libpostgreadapter.windows.template_release.x86_64.dll"
