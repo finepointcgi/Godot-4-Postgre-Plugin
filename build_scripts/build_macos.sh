@@ -44,5 +44,5 @@ scons platform=macos target=template_debug arch=universal -j$(sysctl -n hw.ncpu)
 scons platform=macos target=template_release arch=universal -j$(sysctl -n hw.ncpu)
 
 echo "macOS build completed!"
-echo "Debug framework: demo/bin/libpostgreadapter.macos.template_debug.framework/"
-echo "Release framework: demo/bin/libpostgreadapter.macos.template_release.framework/"
+echo "Debug framework: demo/bin/PostgreAdapter/libpostgreadapter.macos.template_debug.framework/"
+echo "Release framework: demo/bin/PostgreAdapter/libpostgreadapter.macos.template_release.framework/"

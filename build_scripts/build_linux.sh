@@ -40,5 +40,5 @@ scons platform=linux target=template_debug arch=x86_64 -j$(nproc)
 scons platform=linux target=template_release arch=x86_64 -j$(nproc)
 
 echo "Linux build completed!"
-echo "Debug library: demo/bin/libpostgreadapter.linux.template_debug.x86_64.so"
-echo "Release library: demo/bin/libpostgreadapter.linux.template_release.x86_64.so"
+echo "Debug library: demo/bin/PostgreAdapter/libpostgreadapter.linux.template_debug.x86_64.so"
+echo "Release library: demo/bin/PostgreAdapter/libpostgreadapter.linux.template_release.x86_64.so"

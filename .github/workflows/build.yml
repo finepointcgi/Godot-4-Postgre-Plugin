@@ -96,15 +96,15 @@ jobs:
     - name: List build outputs
       run: |
         echo "Build outputs:"
-        ls -la demo/bin/
+        ls -la demo/bin/PostgreAdapter/
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: linux-${{ matrix.arch }}-${{ matrix.target }}
         path: |
-          demo/bin/libpostgreadapter.linux.*.so
-          demo/postgreadapter.gdextension
+          demo/bin/PostgreAdapter/libpostgreadapter.linux.*.so
+          demo/bin/postgreadapter.gdextension
         retention-days: 7
 
   build-windows:
@@ -197,14 +197,14 @@ jobs:
       shell: powershell
       run: |
         Write-Host "Build outputs:"
-        Get-ChildItem demo/bin/ -Recurse
+        Get-ChildItem demo/bin/PostgreAdapter/ -Recurse
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: windows-${{ matrix.arch }}-${{ matrix.target }}
         path: |
-          demo/bin/libpostgreadapter.windows.*.dll
+          demo/bin/PostgreAdapter//libpostgreadapter.windows.*.dll
           demo/postgreadapter.gdextension
         retention-days: 7
 
@@ -261,14 +261,14 @@ jobs:
     - name: List build outputs
       run: |
         echo "Build outputs:"
-        ls -la demo/bin/
+        ls -la demo/bin/PostgreAdapter//
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: macos-${{ matrix.arch }}-${{ matrix.target }}
         path: |
-          demo/bin/libpostgreadapter.macos.*.framework
+          demo/bin/PostgreAdapter//libpostgreadapter.macos.*.framework
           demo/postgreadapter.gdextension
         retention-days: 7
 
@@ -306,7 +306,7 @@ jobs:
         
         # Copy documentation
         cp README.md BUILD.md postgresql-gdextension/docs/ 2>/dev/null || true
-        cp Demo/README.md postgresql-gdextension/docs/DEMO.md 2>/dev/null || true
+        cp demo/README.md postgresql-gdextension/docs/DEMO.md 2>/dev/null || true
         
         # Copy demo files
         cp -r Demo postgresql-gdextension/demo/ 2>/dev/null || true

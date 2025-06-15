@@ -62,5 +62,5 @@ scons platform=windows target=template_release arch=x86_64
 if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo Windows build completed!
-echo Debug library: demo\bin\libpostgreadapter.windows.template_debug.x86_64.dll
-echo Release library: demo\bin\libpostgreadapter.windows.template_release.x86_64.dll
+echo Debug library: bin\PostgreAdapter\build\libpostgreadapter.windows.template_debug.x86_64.dll
+echo Release library: bin\PostgreAdapter\build\libpostgreadapter.windows.template_release.x86_64.dll

@@ -46,9 +46,9 @@ echo "Build completed for $PLATFORM!"
 echo
 echo "Generated files:"
 if [[ "$PLATFORM" == "macos" ]]; then
-    ls -la demo/bin/*.framework/ 2>/dev/null || echo "  No framework files found"
+    ls -la demo/bin/PostgreAdapter/*.framework/ 2>/dev/null || echo "  No framework files found"
 elif [[ "$PLATFORM" == "linux" ]]; then
-    ls -la demo/bin/*.so 2>/dev/null || echo "  No .so files found"
+    ls -la demo/bin/PostgreAdapter/*.so 2>/dev/null || echo "  No .so files found"
 elif [[ "$PLATFORM" == "windows" ]]; then
-    ls -la demo/bin/*.dll 2>/dev/null || echo "  No .dll files found"
+    ls -la demo/bin/PostgreAdapter/*.dll 2>/dev/null || echo "  No .dll files found"
 fi
