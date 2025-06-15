@@ -261,14 +261,14 @@ jobs:
     - name: List build outputs
       run: |
         echo "Build outputs:"
-        ls -la demo/bin/
+        ls -la demo/bin/PostgreAdapter/
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: macos-${{ matrix.arch }}-${{ matrix.target }}
         path: |
-          demo/bin/libpostgreadapter.macos.*.framework
+          demo/bin/PostgreAdapter/libpostgreadapter.macos.*.framework
           Demo/postgreadapter.gdextension
         retention-days: 7
 
@@ -294,12 +294,12 @@ jobs:
 
     - name: Create release package
       run: |
-        mkdir -p postgresql-gdextension/{bin,demo,docs}
+        mkdir -p postgresql-gdextension/{bin/PostgreAdapter,demo,docs}
         
-        # Copy binaries from artifacts
-        find artifacts -name "*.so" -exec cp {} postgresql-gdextension/bin/ \; 2>/dev/null || true
-        find artifacts -name "*.dll" -exec cp {} postgresql-gdextension/bin/ \; 2>/dev/null || true
-        find artifacts -name "*.framework" -exec cp -r {} postgresql-gdextension/bin/ \; 2>/dev/null || true
+        # Copy binaries from artifacts to bin/PostgreAdapter/ structure
+        find artifacts -name "*.so" -exec cp {} postgresql-gdextension/bin/PostgreAdapter/ \; 2>/dev/null || true
+        find artifacts -name "*.dll" -exec cp {} postgresql-gdextension/bin/PostgreAdapter/ \; 2>/dev/null || true
+        find artifacts -name "*.framework" -exec cp -r {} postgresql-gdextension/bin/PostgreAdapter/ \; 2>/dev/null || true
         
         # Copy configuration files
         find artifacts -name "*.gdextension" -exec cp {} postgresql-gdextension/ \; 2>/dev/null || true
@@ -308,8 +308,10 @@ jobs:
         cp README.md BUILD.md postgresql-gdextension/docs/ 2>/dev/null || true
         cp Demo/README.md postgresql-gdextension/docs/DEMO.md 2>/dev/null || true
         
-        # Copy demo files
+        # Copy demo files with correct bin structure
         cp -r Demo postgresql-gdextension/demo/ 2>/dev/null || true
+        # Also copy the bin directory to demo for working demo
+        cp -r postgresql-gdextension/bin postgresql-gdextension/demo/Demo/ 2>/dev/null || true
         
         # Create version info
         echo "PostgreSQL GDExtension" > postgresql-gdextension/VERSION

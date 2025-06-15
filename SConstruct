@@ -100,9 +100,10 @@ else:
     env.Append(CXXFLAGS=['-fexceptions'])
 
 if env["platform"] == "macos":
+    # Create framework structure for macOS
     library = env.SharedLibrary(
-        "demo/bin/PostgreAdapter/libpostgreadapter.{}.{}".format(
-            env["platform"], env["target"]
+        "demo/bin/PostgreAdapter/libpostgreadapter.{}.{}.framework/libpostgreadapter.{}.{}".format(
+            env["platform"], env["target"], env["platform"], env["target"]
         ),
         source=sources,
     )
