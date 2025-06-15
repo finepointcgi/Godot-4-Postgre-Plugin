@@ -101,7 +101,7 @@ else:
 
 if env["platform"] == "macos":
     library = env.SharedLibrary(
-        "demo/bin/libpostgreadapter.{}.{}.framework/libpostgreadapter.{}.{}".format(
+        "demo/bin/PostgreAdapter/libpostgreadapter.{}.{}".format(
             env["platform"], env["target"], env["platform"], env["target"]
         ),
         source=sources,
@@ -109,17 +109,17 @@ if env["platform"] == "macos":
 elif env["platform"] == "ios":
     if env["ios_simulator"]:
         library = env.StaticLibrary(
-            "demo/bin/libpostgreadapter.{}.{}.simulator.a".format(env["platform"], env["target"]),
+            "demo/bin/PostgreAdapter/libpostgreadapter.{}.{}.simulator.a".format(env["platform"], env["target"]),
             source=sources,
         )
     else:
         library = env.StaticLibrary(
-            "demo/bin/libpostgreadapter.{}.{}.a".format(env["platform"], env["target"]),
+            "demo/bin/PostgreAdapter/libpostgreadapter.{}.{}.a".format(env["platform"], env["target"]),
             source=sources,
         )
 else:
     library = env.SharedLibrary(
-        "demo/bin/libpostgreadapter{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
+        "demo/bin/PostgreAdapter/libpostgreadapter{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
         source=sources,
     )
 

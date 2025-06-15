@@ -5,17 +5,17 @@ compatibility_minimum = "4.4"
 
 [libraries]
 
-macos.debug = "bin/libpostgreadapter.macos.template_debug.framework/libpostgreadapter.macos.template_debug"
-macos.release = "bin/libpostgreadapter.macos.template_release.framework/libpostgreadapter.macos.template_release"
+macos.debug = "bin/PostgreAdapter/libpostgreadapter.macos.template_debug.framework/libpostgreadapter.macos.template_debug"
+macos.release = "bin/PostgreAdapter/libpostgreadapter.macos.template_release.framework/libpostgreadapter.macos.template_release"
 
-windows.debug.x86_64 = "bin/libpostgreadapter.windows.template_debug.x86_64.dll"
-windows.release.x86_64 = "bin/libpostgreadapter.windows.template_release.x86_64.dll"
+windows.debug.x86_64 = "bin/PostgreAdapter/libpostgreadapter.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "bin/PostgreAdapter/libpostgreadapter.windows.template_release.x86_64.dll"
 
-linux.debug.x86_64 = "bin/libpostgreadapter.linux.template_debug.x86_64.so"
-linux.release.x86_64 = "bin/libpostgreadapter.linux.template_release.x86_64.so"
+linux.debug.x86_64 = "bin/PostgreAdapter/libpostgreadapter.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "bin/PostgreAdapter/libpostgreadapter.linux.template_release.x86_64.so"
 
-linux.debug.arm64 = "bin/libpostgreadapter.linux.template_debug.arm64.so"
-linux.release.arm64 = "bin/libpostgreadapter.linux.template_release.arm64.so"
+linux.debug.arm64 = "bin/PostgreAdapter/libpostgreadapter.linux.template_debug.arm64.so"
+linux.release.arm64 = "bin/PostgreAdapter/libpostgreadapter.linux.template_release.arm64.so"
 
 [dependencies]
 
