@@ -9,45 +9,105 @@ using namespace godot;
 
 void PostgreAdapter::_bind_methods() {
  	ClassDB::bind_method(D_METHOD("set_connection_string", "connection_string"), &PostgreAdapter::set_connection_string);
+ MethodInfo mi_set_connection_string("set_connection_string", PropertyInfo(Variant::STRING, "connection_string"));
+ mi_set_connection_string.description = "Sets the PostgreSQL connection string. Changing this will re-initialize the connection pool.";
+ ClassDB::add_method_documentation(get_class_static(), mi_set_connection_string);
  	ClassDB::bind_method(D_METHOD("get_connection_string"), &PostgreAdapter::get_connection_string);
+ MethodInfo mi_get_connection_string("get_connection_string");
+ mi_get_connection_string.description = "Returns the current PostgreSQL connection string.";
+ ClassDB::add_method_documentation(get_class_static(), mi_get_connection_string);
  	ADD_PROPERTY(PropertyInfo(Variant::STRING, "connection_string"), "set_connection_string", "get_connection_string");
+ ClassDB::class_set_property_documentation(get_class_static(), "connection_string", "The PostgreSQL connection string. Changing this will re-initialize the connection pool.");
  
  	ClassDB::bind_method(D_METHOD("set_pool_size", "pool_size"), &PostgreAdapter::set_pool_size);
+ 	MethodInfo mi_set_pool_size("set_pool_size", PropertyInfo(Variant::INT, "pool_size"));
+ 	mi_set_pool_size.description = "Sets the maximum number of connections in the pool. Must be greater than 0.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_set_pool_size);
  	ClassDB::bind_method(D_METHOD("get_pool_size"), &PostgreAdapter::get_pool_size);
+ 	MethodInfo mi_get_pool_size("get_pool_size");
+ 	mi_get_pool_size.description = "Returns the current connection pool size.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_get_pool_size);
  	ADD_PROPERTY(PropertyInfo(Variant::INT, "pool_size"), "set_pool_size", "get_pool_size");
+ ClassDB::class_set_property_documentation(get_class_static(), "pool_size", "The maximum number of connections in the pool. Must be greater than 0.");
  
  	ClassDB::bind_method(D_METHOD("connect_to_db"), &PostgreAdapter::connect_to_db);
+ 	MethodInfo mi_connect_to_db("connect_to_db");
+ 	mi_connect_to_db.description = "Initializes the connection pool and attempts to connect to the database. Returns true on success, false otherwise.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_connect_to_db);
  	ClassDB::bind_method(D_METHOD("disconnect_from_db"), &PostgreAdapter::disconnect_from_db);
+ 	MethodInfo mi_disconnect_from_db("disconnect_from_db");
+ 	mi_disconnect_from_db.description = "Shuts down the connection pool and disconnects from the database.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_disconnect_from_db);
  	ClassDB::bind_method(D_METHOD("execute_query", "query", "params"), &PostgreAdapter::execute_query, DEFVAL(Array()));
+ 	MethodInfo mi_execute_query("execute_query", PropertyInfo(Variant::STRING, "query"), PropertyInfo(Variant::ARRAY, "params"));
+ 	mi_execute_query.description = "Executes a SQL query that returns results (e.g., SELECT). Returns an Array of Dictionaries, where each Dictionary represents a row.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_execute_query);
  	ClassDB::bind_method(D_METHOD("execute_non_query", "query", "params"), &PostgreAdapter::execute_non_query, DEFVAL(Array()));
+ 	MethodInfo mi_execute_non_query("execute_non_query", PropertyInfo(Variant::STRING, "query"), PropertyInfo(Variant::ARRAY, "params"));
+ 	mi_execute_non_query.description = "Executes a SQL query that does not return results (e.g., INSERT, UPDATE, DELETE, DDL). Returns the number of affected rows, or -1 on error.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_execute_non_query);
  	ClassDB::bind_method(D_METHOD("_to_string"), &PostgreAdapter::_to_string);
+ 	MethodInfo mi_to_string("_to_string");
+ 	mi_to_string.description = "Returns a string representation of the PostgreAdapter instance.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_to_string);
  	
  	// Transaction methods
  	ClassDB::bind_method(D_METHOD("begin_transaction"), &PostgreAdapter::begin_transaction);
+ 	MethodInfo mi_begin_transaction("begin_transaction");
+ 	mi_begin_transaction.description = "Starts a new database transaction. Returns true on success, false if a transaction is already active or connection fails.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_begin_transaction);
  	ClassDB::bind_method(D_METHOD("commit_transaction"), &PostgreAdapter::commit_transaction);
+ 	MethodInfo mi_commit_transaction("commit_transaction");
+ 	mi_commit_transaction.description = "Commits the active database transaction. Returns true on success, false on failure.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_commit_transaction);
  	ClassDB::bind_method(D_METHOD("rollback_transaction"), &PostgreAdapter::rollback_transaction);
+ 	MethodInfo mi_rollback_transaction("rollback_transaction");
+ 	mi_rollback_transaction.description = "Rolls back the active database transaction. Returns true on success, false on failure.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_rollback_transaction);
  	ClassDB::bind_method(D_METHOD("execute_query_in_transaction", "query", "params"), &PostgreAdapter::execute_query_in_transaction, DEFVAL(Array()));
+ 	MethodInfo mi_execute_query_in_transaction("execute_query_in_transaction", PropertyInfo(Variant::STRING, "query"), PropertyInfo(Variant::ARRAY, "params"));
+ 	mi_execute_query_in_transaction.description = "Executes a SQL query within the active transaction. Returns an Array of Dictionaries, where each Dictionary represents a row.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_execute_query_in_transaction);
  	ClassDB::bind_method(D_METHOD("execute_non_query_in_transaction", "query", "params"), &PostgreAdapter::execute_non_query_in_transaction, DEFVAL(Array()));
+ 	MethodInfo mi_execute_non_query_in_transaction("execute_non_query_in_transaction", PropertyInfo(Variant::STRING, "query"), PropertyInfo(Variant::ARRAY, "params"));
+ 	mi_execute_non_query_in_transaction.description = "Executes a SQL non-query within the active transaction. Returns the number of affected rows, or -1 on error.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_execute_non_query_in_transaction);
  	
  	// Async methods
  	ClassDB::bind_method(D_METHOD("execute_query_async", "query", "params"), &PostgreAdapter::execute_query_async, DEFVAL(Array()));
+ 	MethodInfo mi_execute_query_async("execute_query_async", PropertyInfo(Variant::STRING, "query"), PropertyInfo(Variant::ARRAY, "params"));
+ 	mi_execute_query_async.description = "Executes a SQL query asynchronously. Emits 'query_completed' on success or 'async_query_failed' on error.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_execute_query_async);
  	ClassDB::bind_method(D_METHOD("execute_non_query_async", "query", "params"), &PostgreAdapter::execute_non_query_async, DEFVAL(Array()));
-
-	// Bind signals
-	ADD_SIGNAL(MethodInfo("query_failed", PropertyInfo(Variant::STRING, "query"), PropertyInfo(Variant::STRING, "error_message")));
-	ADD_SIGNAL(MethodInfo("non_query_failed", PropertyInfo(Variant::STRING, "query"), PropertyInfo(Variant::STRING, "error_message")));
-	ADD_SIGNAL(MethodInfo("connection_error", PropertyInfo(Variant::STRING, "error_message")));
-	
-	// Async signals
-	ADD_SIGNAL(MethodInfo("query_completed", PropertyInfo(Variant::ARRAY, "results")));
-	ADD_SIGNAL(MethodInfo("non_query_completed", PropertyInfo(Variant::INT, "affected_rows")));
-	ADD_SIGNAL(MethodInfo("async_query_failed", PropertyInfo(Variant::STRING, "query"), PropertyInfo(Variant::STRING, "error_message")));
-	
-	// Transaction signals
-	ADD_SIGNAL(MethodInfo("transaction_started"));
-	ADD_SIGNAL(MethodInfo("transaction_committed"));
-	ADD_SIGNAL(MethodInfo("transaction_rolled_back"));
-	ADD_SIGNAL(MethodInfo("transaction_failed", PropertyInfo(Variant::STRING, "error_message")));
+ 	MethodInfo mi_execute_non_query_async("execute_non_query_async", PropertyInfo(Variant::STRING, "query"), PropertyInfo(Variant::ARRAY, "params"));
+ 	mi_execute_non_query_async.description = "Executes a SQL non-query asynchronously. Emits 'non_query_completed' on success or 'async_query_failed' on error.";
+ 	ClassDB::add_method_documentation(get_class_static(), mi_execute_non_query_async);
+ 
+ 	// Bind signals
+ 	ADD_SIGNAL(MethodInfo("query_failed", PropertyInfo(Variant::STRING, "query"), PropertyInfo(Variant::STRING, "error_message")));
+ ClassDB::class_set_signal_documentation(get_class_static(), "query_failed", "Emitted when a query fails to execute. Provides the query string and an error message.");
+ 	ADD_SIGNAL(MethodInfo("non_query_failed", PropertyInfo(Variant::STRING, "query"), PropertyInfo(Variant::STRING, "error_message")));
+ ClassDB::class_set_signal_documentation(get_class_static(), "non_query_failed", "Emitted when a non-query fails to execute. Provides the query string and an error message.");
+ 	ADD_SIGNAL(MethodInfo("connection_error", PropertyInfo(Variant::STRING, "error_message")));
+ ClassDB::class_set_signal_documentation(get_class_static(), "connection_error", "Emitted when a connection error occurs. Provides an error message.");
+ 	
+ 	// Async signals
+ 	ADD_SIGNAL(MethodInfo("query_completed", PropertyInfo(Variant::ARRAY, "results")));
+ ClassDB::class_set_signal_documentation(get_class_static(), "query_completed", "Emitted when an asynchronous query completes successfully. Provides the query results as an Array of Dictionaries.");
+ 	ADD_SIGNAL(MethodInfo("non_query_completed", PropertyInfo(Variant::INT, "affected_rows")));
+ ClassDB::class_set_signal_documentation(get_class_static(), "non_query_completed", "Emitted when an asynchronous non-query completes successfully. Provides the number of affected rows.");
+ 	ADD_SIGNAL(MethodInfo("async_query_failed", PropertyInfo(Variant::STRING, "query"), PropertyInfo(Variant::STRING, "error_message")));
+ ClassDB::class_set_signal_documentation(get_class_static(), "async_query_failed", "Emitted when an asynchronous query or non-query fails. Provides the query string and an error message.");
+ 	
+ 	// Transaction signals
+ 	ADD_SIGNAL(MethodInfo("transaction_started"));
+ ClassDB::class_set_signal_documentation(get_class_static(), "transaction_started", "Emitted when a new database transaction is successfully started.");
+ 	ADD_SIGNAL(MethodInfo("transaction_committed"));
+ ClassDB::class_set_signal_documentation(get_class_static(), "transaction_committed", "Emitted when an active database transaction is successfully committed.");
+ 	ADD_SIGNAL(MethodInfo("transaction_rolled_back"));
+ ClassDB::class_set_signal_documentation(get_class_static(), "transaction_rolled_back", "Emitted when an active database transaction is successfully rolled back.");
+ 	ADD_SIGNAL(MethodInfo("transaction_failed", PropertyInfo(Variant::STRING, "error_message")));
+ ClassDB::class_set_signal_documentation(get_class_static(), "transaction_failed", "Emitted when a transaction operation (begin, commit, rollback) fails. Provides an error message.");
 }
  
 PostgreAdapter::PostgreAdapter() :
