@@ -121,10 +121,17 @@ def configure_postgresql_libs(env):
             print("pkg-config not available, using fallback paths")
             env.Append(CPPPATH=["/usr/include/pqxx", "/usr/include/postgresql"])
             
-            # Architecture-specific library paths
-            if target_arch == "x86_64":
+            # Architecture-specific library paths 
+            arch_mapping = {
+                "x86_64": "x86_64",
+                "arm64": "aarch64",  # ARM64 uses aarch64 in library paths
+                "aarch64": "aarch64"
+            }
+            lib_arch = arch_mapping.get(target_arch, target_arch)
+            
+            if lib_arch == "x86_64":
                 env.Append(LIBPATH=["/usr/lib/x86_64-linux-gnu", "/usr/lib64", "/usr/lib"])
-            elif target_arch == "arm64":
+            elif lib_arch == "aarch64":
                 env.Append(LIBPATH=["/usr/lib/aarch64-linux-gnu", "/usr/lib64", "/usr/lib"])
             else:
                 env.Append(LIBPATH=["/usr/lib", "/usr/lib64"])
@@ -138,105 +145,31 @@ def configure_postgresql_libs(env):
         env["bundle_method"] = bundle_method
             
     elif platform == "windows":
-        # Windows - use vcpkg installed libraries or PostgreSQL installation
+        # Windows - Always use dynamic linking and bundle DLLs for user distribution
         pg_path = os.environ.get("POSTGRESQL_PATH", "C:\\Program Files\\PostgreSQL\\16")
         vcpkg_root = os.environ.get("VCPKG_ROOT", "")
-        bundle_deps = os.environ.get("BUNDLE_DEPENDENCIES", "true").lower() == "true"
         
+        # Force DLL bundling for end-user distribution
+        bundle_deps = True
+        print("Windows build: Always bundling dependencies for end-user distribution")
         print("PostgreSQL path: {}".format(pg_path))
         print("vcpkg root: {}".format(vcpkg_root))
-        print("Bundle dependencies: {}".format(bundle_deps))
         
         env.Append(CPPPATH=[
             os.path.join(pg_path, "include")
         ])
         env.Append(LIBPATH=[os.path.join(pg_path, "lib")])
         
-        # Check for static libraries availability
-        static_libs_available = False
-        pqxx_static_lib = ""
-        
         # Use vcpkg toolchain if available
         if vcpkg_root:
             env.Append(CPPPATH=[os.path.join(vcpkg_root, "installed", "x64-windows", "include")])
             env.Append(LIBPATH=[os.path.join(vcpkg_root, "installed", "x64-windows", "lib")])
-            
-            # Check if static libraries exist in vcpkg
-            vcpkg_lib_path = os.path.join(vcpkg_root, "installed", "x64-windows", "lib")
-            if os.path.exists(os.path.join(vcpkg_lib_path, "pqxx_static.lib")):
-                static_libs_available = True
-                pqxx_static_lib = "pqxx_static"
-                print("Found vcpkg static libraries")
-            elif os.path.exists(os.path.join(vcpkg_lib_path, "pqxx.lib")):
-                print("Found vcpkg dynamic libraries")
-            
-            # For vcpkg, prefer static linking if available
-            if bundle_deps and static_libs_available:
-                env.Append(LIBS=[pqxx_static_lib, "libpq", "ws2_32", "advapi32", "kernel32", "user32", "gdi32", "winspool", "shell32", "ole32", "oleaut32", "uuid", "comdlg32"])
-                env.Append(CPPDEFINES=["PQXX_SHARED=0"])  # Use static pqxx
-                print("Using vcpkg static linking")
-            else:
-                env.Append(LIBS=["pqxx", "libpq", "ws2_32", "advapi32"])
-                print("Using vcpkg dynamic linking")
+            print("Using vcpkg dynamic linking with DLL bundling")
         else:
-            # Standard PostgreSQL installation
-            pg_lib_path = os.path.join(pg_path, "lib")
-            
-            # Check for static libraries in PostgreSQL installation
-            # Try multiple possible static library names
-            static_lib_candidates = [
-                "libpqxx_static.lib",
-                "pqxx_static.lib", 
-                "pqxx.lib",  # Sometimes static versions use same name
-                "libpqxx.lib"
-            ]
-            
-            dynamic_lib_found = False
-            for lib_name in static_lib_candidates:
-                lib_path = os.path.join(pg_lib_path, lib_name)
-                if os.path.exists(lib_path):
-                    if "static" in lib_name.lower():
-                        static_libs_available = True
-                        pqxx_static_lib = lib_name.replace(".lib", "")
-                        print("Found PostgreSQL static library: {}".format(lib_name))
-                        break
-                    else:
-                        dynamic_lib_found = True
-                        print("Found PostgreSQL dynamic library: {}".format(lib_name))
-            
-            # Also check for libpq specifically
-            libpq_found = any(os.path.exists(os.path.join(pg_lib_path, name)) for name in ["libpq.lib", "pq.lib"])
-            
-            if not dynamic_lib_found and not static_libs_available:
-                print("Warning: No PostgreSQL libraries found at expected location: {}".format(pg_lib_path))
-                print("Available files in lib directory:")
-                try:
-                    import os
-                    if os.path.exists(pg_lib_path):
-                        for f in os.listdir(pg_lib_path):
-                            if f.endswith('.lib'):
-                                print("  {}".format(f))
-                except Exception:
-                    pass
-            
-            if bundle_deps and static_libs_available:
-                # Use static linking
-                env.Append(LIBS=[pqxx_static_lib, "libpq", "ws2_32", "advapi32", "secur32", "crypt32"])
-                env.Append(CPPDEFINES=["PQXX_SHARED=0"])
-                print("Using PostgreSQL static linking")
-            else:
-                # Use dynamic linking - try common library names
-                if dynamic_lib_found or libpq_found:
-                    # Use most common names for PostgreSQL installations
-                    env.Append(LIBS=["libpqxx", "libpq", "ws2_32", "advapi32"])
-                    if not static_libs_available and bundle_deps:
-                        print("Static libraries not found, using dynamic linking with DLL bundling")
-                    else:
-                        print("Using PostgreSQL dynamic linking")
-                else:
-                    # Last resort - try without libpqxx, user might have different setup
-                    print("libpqxx not found, attempting build with basic PostgreSQL libraries")
-                    env.Append(LIBS=["libpq", "ws2_32", "advapi32"])
+            print("Using PostgreSQL installation dynamic linking with DLL bundling")
+        
+        # Always use dynamic linking - simpler and allows DLL bundling
+        env.Append(LIBS=["libpqxx", "libpq", "ws2_32", "advapi32"])
         
         # Store bundle flag for later use
         env["bundle_deps"] = bundle_deps
@@ -261,18 +194,42 @@ def copy_windows_dependencies(env, target):
     vcpkg_root = os.environ.get("VCPKG_ROOT", "")
     target_dir = os.path.dirname(str(target[0]))
     
-    required_dlls = ["libpq.dll", "libcrypto-3-x64.dll", "libssl-3-x64.dll"]
-    optional_dlls = ["pqxx.dll"]
+    # Comprehensive list of required DLLs for distribution
+    required_dlls = [
+        "libpq.dll",           # PostgreSQL client library
+        "libcrypto-3-x64.dll", # OpenSSL crypto (newer naming)
+        "libssl-3-x64.dll",    # OpenSSL SSL (newer naming)
+    ]
+    optional_dlls = [
+        "pqxx.dll",            # libpqxx C++ wrapper
+        "libcrypto-1_1-x64.dll",  # OpenSSL crypto (older naming)
+        "libssl-1_1-x64.dll",     # OpenSSL SSL (older naming)
+        "libeay32.dll",        # OpenSSL crypto (legacy naming)
+        "ssleay32.dll",        # OpenSSL SSL (legacy naming)
+        "msvcr120.dll",        # Visual C++ runtime (sometimes needed)
+        "msvcp120.dll",        # Visual C++ runtime (sometimes needed)
+    ]
     
     print("Copying Windows dependencies to: {}".format(target_dir))
     
-    # Search locations for DLLs
+    # Search locations for DLLs (comprehensive search)
     search_paths = []
     if vcpkg_root:
         search_paths.append(os.path.join(vcpkg_root, "installed", "x64-windows", "bin"))
+        search_paths.append(os.path.join(vcpkg_root, "installed", "x64-windows", "lib"))
+    
+    # PostgreSQL installation paths
     search_paths.extend([
         os.path.join(pg_path, "bin"),
         os.path.join(pg_path, "lib")
+    ])
+    
+    # System paths (for OpenSSL and runtime DLLs)
+    search_paths.extend([
+        "C:\\Windows\\System32",
+        "C:\\Windows\\SysWOW64",
+        os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "OpenSSL-Win64", "bin"),
+        os.path.join(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"), "OpenSSL-Win32", "bin")
     ])
     
     for dll in required_dlls + optional_dlls:
@@ -305,7 +262,7 @@ def bundle_macos_dependencies(env, target):
     # Fix framework path detection
     if ".framework/" in target_path:
         # Path like: demo/bin/PostgreAdapter/libpostgreadapter.macos.template_debug.framework/libpostgreadapter.macos.template_debug
-        framework_path = target_path[:target_path.find(".framework/") + len(".framework")]
+        framework_path = target_path[:target_path.find(".framework") + len(".framework")]
         binary_path = target_path
     else:
         # Fallback
@@ -330,12 +287,15 @@ def bundle_macos_dependencies(env, target):
     required_libs = ["libpqxx", "libpq", "libssl", "libcrypto"]
     
     for lib in required_libs:
-        # Search for dylib
+        # Search for dylib - more comprehensive search
         search_paths = [
-            os.path.join(homebrew_prefix, "opt", lib, "lib"),
             os.path.join(homebrew_prefix, "opt", "libpqxx", "lib"),
-            os.path.join(homebrew_prefix, "opt", "libpq", "lib"), 
-            os.path.join(homebrew_prefix, "lib")
+            os.path.join(homebrew_prefix, "opt", "libpq", "lib"),
+            os.path.join(homebrew_prefix, "opt", "openssl@3", "lib"),  # OpenSSL 3.x
+            os.path.join(homebrew_prefix, "opt", "openssl@1.1", "lib"), # OpenSSL 1.1.x  
+            os.path.join(homebrew_prefix, "opt", "openssl", "lib"),    # Generic OpenSSL
+            os.path.join(homebrew_prefix, "lib"),
+            "/usr/lib",  # System libraries fallback
         ]
         
         dylib_path = None
@@ -401,15 +361,25 @@ def bundle_linux_dependencies(env, target):
         libpq_libdir = "/usr/lib"
     
     target_arch = os.environ.get("TARGET_ARCH", "x86_64")
+    
+    # Map architecture names for library paths
+    arch_mapping = {
+        "x86_64": "x86_64",
+        "arm64": "aarch64",  # ARM64 uses aarch64 in library paths
+        "aarch64": "aarch64"
+    }
+    lib_arch = arch_mapping.get(target_arch, target_arch)
+    
     search_paths = [
         libpqxx_libdir,
         libpq_libdir,
-        "/usr/lib/{}-linux-gnu".format(target_arch),
+        "/usr/lib/{}-linux-gnu".format(lib_arch),
         "/usr/lib64",
         "/usr/lib",
-        "/lib/{}-linux-gnu".format(target_arch),
+        "/lib/{}-linux-gnu".format(lib_arch),
         "/lib64",
-        "/lib"
+        "/lib",
+        "/usr/local/lib",  # Common for manually installed libraries
     ]
     
     for lib in required_libs:

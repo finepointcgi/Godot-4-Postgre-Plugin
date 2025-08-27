@@ -341,7 +341,7 @@ bundle_framework_dependencies() {
 }
 
 # Bundle dependencies for frameworks if using dynamic linking
-if [[ "$export BUNDLE_METHOD_ACTUAL" == "dynamic" ]]; then
+if [[ "$BUNDLE_METHOD_ACTUAL" == "dynamic" ]]; then
     info ""
     info "Bundling framework dependencies..."
     
@@ -389,7 +389,7 @@ info "  2. The plugin should now load without dependency errors"
 info "  3. Configure your PostgreSQL connection string"
 info "  4. Test the plugin functionality"
 
-if [[ "$export BUNDLE_METHOD_ACTUAL" == "static" ]]; then
+if [[ "$BUNDLE_METHOD_ACTUAL" == "static" ]]; then
     info ""
     success "Built with static linking - frameworks are fully self-contained"
 else
