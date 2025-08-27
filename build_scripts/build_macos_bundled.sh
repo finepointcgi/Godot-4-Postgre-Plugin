@@ -22,6 +22,7 @@ BUILD_TYPE="both"
 BUNDLE_METHOD="auto"
 VERBOSE=false
 HOMEBREW_PREFIX=""
+ARCH="auto"
 
 # Parse command line arguments
 show_help() {
@@ -36,6 +37,7 @@ OPTIONS:
     --static           Force static linking (self-contained framework)
     --dynamic          Force dynamic linking with bundled dylibs
     --homebrew-prefix  Override Homebrew prefix detection
+    --arch ARCH        Build architecture (arm64, x86_64, universal, auto)
     --verbose, -v      Verbose output
 
 DESCRIPTION:
@@ -87,6 +89,10 @@ while [[ $# -gt 0 ]]; do
             HOMEBREW_PREFIX="$2"
             shift 2
             ;;
+        --arch)
+            ARCH="$2"
+            shift 2
+            ;;
         --verbose|-v)
             VERBOSE=true
             shift
@@ -104,6 +110,7 @@ info ""
 info "Build configuration:"
 info "  Build type: $BUILD_TYPE"
 info "  Bundle method: $BUNDLE_METHOD"
+info "  Architecture: $ARCH"
 info "  Verbose: $VERBOSE"
 info ""
 
@@ -153,6 +160,39 @@ success "Dependencies found"
 info "  libpqxx: $LIBPQXX_PATH"
 info "  libpq: $LIBPQ_PATH"
 
+# Determine build architecture
+if [[ "$ARCH" == "auto" ]]; then
+    # Check library architecture to determine what we can build
+    if [[ -f "$LIBPQXX_PATH/lib/libpqxx.dylib" ]]; then
+        LIPO_OUTPUT=$(lipo -info "$LIBPQXX_PATH/lib/libpqxx.dylib" 2>/dev/null || echo "unknown")
+        info "Library architecture info: $LIPO_OUTPUT"
+        
+        if [[ "$LIPO_OUTPUT" == *"Non-fat file"* ]]; then
+            # Single architecture library
+            if [[ "$LIPO_OUTPUT" == *"arm64"* ]]; then
+                ARCH="arm64"
+                info "Auto-detected: Using arm64 architecture (library is ARM64-only)"
+            elif [[ "$LIPO_OUTPUT" == *"x86_64"* ]]; then
+                ARCH="x86_64"
+                info "Auto-detected: Using x86_64 architecture (library is x86_64-only)"
+            else
+                ARCH="universal"
+                warning "Could not detect library architecture, defaulting to universal"
+            fi
+        else
+            # Universal library or multiple architectures
+            ARCH="universal"
+            info "Auto-detected: Using universal architecture (library supports multiple architectures)"
+        fi
+    else
+        # No library file found, default to universal
+        ARCH="universal"
+        warning "Could not check library architecture, defaulting to universal"
+    fi
+fi
+
+info "Final build architecture: $ARCH"
+
 # Determine bundling strategy
 BUNDLE_DEPENDENCIES="true"
 STATIC_LIBS_AVAILABLE=false
@@ -200,12 +240,12 @@ cd godot-cpp
 
 if [[ "$BUILD_TYPE" == "both" ]] || [[ "$BUILD_TYPE" == "debug" ]]; then
     info "  Building godot-cpp debug..."
-    scons platform=macos target=template_debug arch=universal -j$(sysctl -n hw.ncpu) $SCONS_FLAGS || error "Failed to build godot-cpp debug"
+    scons platform=macos target=template_debug arch="$ARCH" -j$(sysctl -n hw.ncpu) $SCONS_FLAGS || error "Failed to build godot-cpp debug"
 fi
 
 if [[ "$BUILD_TYPE" == "both" ]] || [[ "$BUILD_TYPE" == "release" ]]; then
     info "  Building godot-cpp release..."
-    scons platform=macos target=template_release arch=universal -j$(sysctl -n hw.ncpu) $SCONS_FLAGS || error "Failed to build godot-cpp release"
+    scons platform=macos target=template_release arch="$ARCH" -j$(sysctl -n hw.ncpu) $SCONS_FLAGS || error "Failed to build godot-cpp release"
 fi
 
 cd ..
@@ -216,13 +256,13 @@ info "Building PostgreSQL extension..."
 
 if [[ "$BUILD_TYPE" == "both" ]] || [[ "$BUILD_TYPE" == "debug" ]]; then
     info "  Building extension debug..."
-    scons platform=macos target=template_debug arch=universal -j$(sysctl -n hw.ncpu) $SCONS_FLAGS || error "Failed to build PostgreSQL extension debug"
+    scons platform=macos target=template_debug arch="$ARCH" -j$(sysctl -n hw.ncpu) $SCONS_FLAGS || error "Failed to build PostgreSQL extension debug"
     success "Debug build completed"
 fi
 
 if [[ "$BUILD_TYPE" == "both" ]] || [[ "$BUILD_TYPE" == "release" ]]; then
     info "  Building extension release..."
-    scons platform=macos target=template_release arch=universal -j$(sysctl -n hw.ncpu) $SCONS_FLAGS || error "Failed to build PostgreSQL extension release"
+    scons platform=macos target=template_release arch="$ARCH" -j$(sysctl -n hw.ncpu) $SCONS_FLAGS || error "Failed to build PostgreSQL extension release"
     success "Release build completed"
 fi
 

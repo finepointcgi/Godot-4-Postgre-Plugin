@@ -112,6 +112,13 @@ if "%FOUND_VCPKG%"=="false" and "%FOUND_POSTGRES%"=="false" (
     echo         1. Install PostgreSQL from https://www.postgresql.org/download/windows/
     echo         2. Or install via vcpkg: vcpkg install libpqxx:x64-windows
     echo         3. Or set POSTGRESQL_PATH environment variable
+    echo.
+    echo Note: This plugin requires libpqxx C++ library in addition to PostgreSQL.
+    echo For vcpkg installation:
+    echo   git clone https://github.com/Microsoft/vcpkg.git
+    echo   cd vcpkg
+    echo   .\bootstrap-vcpkg.bat
+    echo   .\vcpkg install libpqxx:x64-windows
     exit /b 1
 )
 

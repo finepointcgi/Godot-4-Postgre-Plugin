@@ -28,9 +28,32 @@ def configure_postgresql_libs(env):
         bundle_deps = os.environ.get("BUNDLE_DEPENDENCIES", "true").lower() == "true"
         bundle_method = os.environ.get("BUNDLE_METHOD_ACTUAL", "auto")
         
+        # Check build architecture - if universal requested, check if libs support it
+        build_arch = env.get("arch", "universal")
+        
         print("macOS Homebrew prefix: {}".format(homebrew_prefix))
         print("Bundle dependencies: {}".format(bundle_deps))
         print("Bundle method: {}".format(bundle_method))
+        print("Build architecture: {}".format(build_arch))
+        
+        # Check if libraries exist and what architectures they support
+        libpqxx_path = os.path.join(homebrew_prefix, "opt", "libpqxx", "lib", "libpqxx.dylib")
+        if os.path.exists(libpqxx_path):
+            try:
+                # Check library architecture
+                lipo_output = subprocess.check_output(["lipo", "-info", libpqxx_path], universal_newlines=True)
+                print("libpqxx architecture: {}".format(lipo_output.strip()))
+                
+                # If building universal but library is single-arch, adjust build
+                if build_arch == "universal" and "Non-fat file" in lipo_output:
+                    if "arm64" in lipo_output:
+                        print("Homebrew libraries are ARM64-only, switching to arm64 build")
+                        env["arch"] = "arm64"
+                    elif "x86_64" in lipo_output:
+                        print("Homebrew libraries are x86_64-only, switching to x86_64 build")
+                        env["arch"] = "x86_64"
+            except (subprocess.CalledProcessError, OSError):
+                print("Could not check library architecture, proceeding with requested arch")
         
         env.Append(CPPPATH=[
             os.path.join(homebrew_prefix, "opt", "libpqxx", "include"),
@@ -129,25 +152,91 @@ def configure_postgresql_libs(env):
         ])
         env.Append(LIBPATH=[os.path.join(pg_path, "lib")])
         
+        # Check for static libraries availability
+        static_libs_available = False
+        pqxx_static_lib = ""
+        
         # Use vcpkg toolchain if available
         if vcpkg_root:
             env.Append(CPPPATH=[os.path.join(vcpkg_root, "installed", "x64-windows", "include")])
             env.Append(LIBPATH=[os.path.join(vcpkg_root, "installed", "x64-windows", "lib")])
             
-            # For vcpkg, prefer static linking to avoid DLL dependencies
-            if bundle_deps:
-                env.Append(LIBS=["pqxx_static", "libpq", "ws2_32", "advapi32", "kernel32", "user32", "gdi32", "winspool", "shell32", "ole32", "oleaut32", "uuid", "comdlg32"])
+            # Check if static libraries exist in vcpkg
+            vcpkg_lib_path = os.path.join(vcpkg_root, "installed", "x64-windows", "lib")
+            if os.path.exists(os.path.join(vcpkg_lib_path, "pqxx_static.lib")):
+                static_libs_available = True
+                pqxx_static_lib = "pqxx_static"
+                print("Found vcpkg static libraries")
+            elif os.path.exists(os.path.join(vcpkg_lib_path, "pqxx.lib")):
+                print("Found vcpkg dynamic libraries")
+            
+            # For vcpkg, prefer static linking if available
+            if bundle_deps and static_libs_available:
+                env.Append(LIBS=[pqxx_static_lib, "libpq", "ws2_32", "advapi32", "kernel32", "user32", "gdi32", "winspool", "shell32", "ole32", "oleaut32", "uuid", "comdlg32"])
                 env.Append(CPPDEFINES=["PQXX_SHARED=0"])  # Use static pqxx
+                print("Using vcpkg static linking")
             else:
                 env.Append(LIBS=["pqxx", "libpq", "ws2_32", "advapi32"])
+                print("Using vcpkg dynamic linking")
         else:
             # Standard PostgreSQL installation
-            if bundle_deps:
-                # Try to link statically first
-                env.Append(LIBS=["libpqxx_static", "libpq", "ws2_32", "advapi32", "secur32", "crypt32"])
+            pg_lib_path = os.path.join(pg_path, "lib")
+            
+            # Check for static libraries in PostgreSQL installation
+            # Try multiple possible static library names
+            static_lib_candidates = [
+                "libpqxx_static.lib",
+                "pqxx_static.lib", 
+                "pqxx.lib",  # Sometimes static versions use same name
+                "libpqxx.lib"
+            ]
+            
+            dynamic_lib_found = False
+            for lib_name in static_lib_candidates:
+                lib_path = os.path.join(pg_lib_path, lib_name)
+                if os.path.exists(lib_path):
+                    if "static" in lib_name.lower():
+                        static_libs_available = True
+                        pqxx_static_lib = lib_name.replace(".lib", "")
+                        print("Found PostgreSQL static library: {}".format(lib_name))
+                        break
+                    else:
+                        dynamic_lib_found = True
+                        print("Found PostgreSQL dynamic library: {}".format(lib_name))
+            
+            # Also check for libpq specifically
+            libpq_found = any(os.path.exists(os.path.join(pg_lib_path, name)) for name in ["libpq.lib", "pq.lib"])
+            
+            if not dynamic_lib_found and not static_libs_available:
+                print("Warning: No PostgreSQL libraries found at expected location: {}".format(pg_lib_path))
+                print("Available files in lib directory:")
+                try:
+                    import os
+                    if os.path.exists(pg_lib_path):
+                        for f in os.listdir(pg_lib_path):
+                            if f.endswith('.lib'):
+                                print("  {}".format(f))
+                except Exception:
+                    pass
+            
+            if bundle_deps and static_libs_available:
+                # Use static linking
+                env.Append(LIBS=[pqxx_static_lib, "libpq", "ws2_32", "advapi32", "secur32", "crypt32"])
                 env.Append(CPPDEFINES=["PQXX_SHARED=0"])
+                print("Using PostgreSQL static linking")
             else:
-                env.Append(LIBS=["pqxx", "libpq", "ws2_32", "advapi32"])
+                # Use dynamic linking - try common library names
+                if dynamic_lib_found or libpq_found:
+                    # Use most common names for PostgreSQL installations
+                    env.Append(LIBS=["libpqxx", "libpq", "ws2_32", "advapi32"])
+                    if not static_libs_available and bundle_deps:
+                        print("Static libraries not found, using dynamic linking with DLL bundling")
+                    else:
+                        print("Using PostgreSQL dynamic linking")
+                else:
+                    # Last resort - try without libpqxx, user might have different setup
+                    print("libpqxx not found, attempting build with basic PostgreSQL libraries")
+                    env.Append(LIBS=["libpq", "ws2_32", "advapi32"])
         
         # Store bundle flag for later use
         env["bundle_deps"] = bundle_deps
@@ -212,20 +301,30 @@ def bundle_macos_dependencies(env, target):
     import subprocess
     
     target_path = str(target[0])
-    if not target_path.endswith(".framework"):
-        framework_path = target_path
+    
+    # Fix framework path detection
+    if ".framework/" in target_path:
+        # Path like: demo/bin/PostgreAdapter/libpostgreadapter.macos.template_debug.framework/libpostgreadapter.macos.template_debug
+        framework_path = target_path[:target_path.find(".framework/") + len(".framework")]
         binary_path = target_path
     else:
+        # Fallback
         framework_path = os.path.dirname(target_path)
         binary_path = target_path
     
     homebrew_prefix = os.environ.get("HOMEBREW_PREFIX", "/opt/homebrew" if os.path.exists("/opt/homebrew") else "/usr/local")
     
     print("Bundling macOS dependencies for: {}".format(os.path.basename(framework_path)))
+    print("Framework path: {}".format(framework_path))
+    print("Binary path: {}".format(binary_path))
     
     # Create Libraries directory in framework
     libs_dir = os.path.join(framework_path, "Libraries")
-    os.makedirs(libs_dir, exist_ok=True)
+    try:
+        os.makedirs(libs_dir, exist_ok=True)
+    except Exception as e:
+        print("Error creating Libraries directory: {}".format(e))
+        return
     
     # Required libraries
     required_libs = ["libpqxx", "libpq", "libssl", "libcrypto"]
