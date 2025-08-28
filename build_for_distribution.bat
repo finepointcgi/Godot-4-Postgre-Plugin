@@ -37,11 +37,17 @@ echo.
 REM Try to find PostgreSQL or vcpkg installation
 set FOUND_SETUP=false
 
-REM Check vcpkg first (preferred)
+REM Check vcpkg first (preferred for C++ libraries)
 if defined VCPKG_ROOT (
     if exist "%VCPKG_ROOT%\installed\x64-windows\include\pqxx" (
-        echo [OK] Found vcpkg PostgreSQL installation
+        echo [OK] Found vcpkg PostgreSQL C++ installation
         set FOUND_SETUP=true
+        set SETUP_TYPE=vcpkg
+    ) else if exist "%VCPKG_ROOT%\installed\x64-windows\include\libpq-fe.h" (
+        echo [OK] Found vcpkg PostgreSQL C installation ^(missing C++ wrapper^)
+        echo [INFO] Will install libpqxx automatically
+        set FOUND_SETUP=true
+        set SETUP_TYPE=vcpkg_incomplete
     )
 )
 
@@ -51,7 +57,9 @@ if "%FOUND_SETUP%"=="false" (
         if exist "%%i\include\libpq-fe.h" (
             set POSTGRESQL_PATH=%%i
             echo [OK] Found PostgreSQL at: %%i
+            echo [WARNING] Standard PostgreSQL lacks libpqxx C++ wrapper
             set FOUND_SETUP=true
+            set SETUP_TYPE=postgresql_only
             goto found_pg
         )
     )
@@ -62,22 +70,58 @@ if "%FOUND_SETUP%"=="false" (
     echo.
     echo [ERROR] PostgreSQL development libraries not found!
     echo.
-    echo QUICK SETUP OPTIONS:
+    echo RECOMMENDED SETUP ^(Easy C++ support^):
     echo.
-    echo Option 1 - Install PostgreSQL ^(Recommended^):
-    echo   1. Download from: https://www.postgresql.org/download/windows/
-    echo   2. Run installer and include development libraries
-    echo   3. Run this script again
+    echo 1. Install vcpkg ^(one-time setup^):
+    echo    git clone https://github.com/Microsoft/vcpkg.git
+    echo    cd vcpkg
+    echo    .\bootstrap-vcpkg.bat
     echo.
-    echo Option 2 - Use vcpkg:
-    echo   1. git clone https://github.com/Microsoft/vcpkg.git
-    echo   2. cd vcpkg ^&^& .\bootstrap-vcpkg.bat
-    echo   3. .\vcpkg install libpqxx:x64-windows
-    echo   4. set VCPKG_ROOT=C:\path\to\vcpkg
-    echo   5. Run this script again
+    echo 2. Install PostgreSQL C++ libraries:
+    echo    .\vcpkg install libpqxx:x64-windows
+    echo.
+    echo 3. Set environment variable:
+    echo    set VCPKG_ROOT=C:\path\to\vcpkg
+    echo.
+    echo 4. Run this script again
+    echo.
+    echo ALTERNATIVE ^(PostgreSQL only^):
+    echo   Download PostgreSQL from: https://www.postgresql.org/download/windows/
+    echo   ^(May require additional setup for C++ wrapper^)
     echo.
     pause
     exit /b 1
+)
+
+REM Handle vcpkg setup if needed
+if "%SETUP_TYPE%"=="vcpkg_incomplete" (
+    echo.
+    echo [INFO] Installing missing libpqxx C++ wrapper...
+    cd /d "%VCPKG_ROOT%"
+    .\vcpkg install libpqxx:x64-windows
+    if %errorlevel% neq 0 (
+        echo [ERROR] Failed to install libpqxx
+        pause
+        exit /b 1
+    )
+    echo [OK] libpqxx installed successfully
+    echo.
+)
+
+if "%SETUP_TYPE%"=="postgresql_only" (
+    echo.
+    echo [WARNING] Using PostgreSQL without libpqxx C++ wrapper
+    echo           This may require vcpkg for full functionality:
+    echo.
+    echo   Quick vcpkg setup:
+    echo   1. git clone https://github.com/Microsoft/vcpkg.git
+    echo   2. cd vcpkg ^&^& .\bootstrap-vcpkg.bat  
+    echo   3. .\vcpkg install libpqxx:x64-windows
+    echo   4. set VCPKG_ROOT=C:\path\to\vcpkg
+    echo.
+    echo   Press any key to continue with current setup...
+    pause >nul
+    echo.
 )
 
 echo.

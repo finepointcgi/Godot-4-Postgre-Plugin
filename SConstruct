@@ -160,16 +160,75 @@ def configure_postgresql_libs(env):
         ])
         env.Append(LIBPATH=[os.path.join(pg_path, "lib")])
         
+        # Check for available libraries and determine linking strategy
+        available_libs = []
+        lib_search_paths = []
+        
         # Use vcpkg toolchain if available
         if vcpkg_root:
-            env.Append(CPPPATH=[os.path.join(vcpkg_root, "installed", "x64-windows", "include")])
-            env.Append(LIBPATH=[os.path.join(vcpkg_root, "installed", "x64-windows", "lib")])
+            vcpkg_lib_path = os.path.join(vcpkg_root, "installed", "x64-windows", "lib")
+            vcpkg_inc_path = os.path.join(vcpkg_root, "installed", "x64-windows", "include")
+            
+            env.Append(CPPPATH=[vcpkg_inc_path])
+            env.Append(LIBPATH=[vcpkg_lib_path])
+            lib_search_paths.append(vcpkg_lib_path)
             print("Using vcpkg dynamic linking with DLL bundling")
-        else:
-            print("Using PostgreSQL installation dynamic linking with DLL bundling")
         
-        # Always use dynamic linking - simpler and allows DLL bundling
-        env.Append(LIBS=["libpqxx", "libpq", "ws2_32", "advapi32"])
+        # Add PostgreSQL paths
+        pg_lib_path = os.path.join(pg_path, "lib")
+        lib_search_paths.append(pg_lib_path)
+        
+        # Check for libpqxx availability (C++ wrapper)
+        libpqxx_found = False
+        for search_path in lib_search_paths:
+            for lib_name in ["pqxx.lib", "libpqxx.lib", "pqxx_static.lib", "libpqxx_static.lib"]:
+                if os.path.exists(os.path.join(search_path, lib_name)):
+                    libpqxx_found = True
+                    available_libs.append(lib_name.replace(".lib", ""))
+                    print("Found libpqxx: {} in {}".format(lib_name, search_path))
+                    break
+            if libpqxx_found:
+                break
+        
+        # Check for libpq availability (C client)
+        libpq_found = False
+        for search_path in lib_search_paths:
+            for lib_name in ["libpq.lib", "pq.lib"]:
+                if os.path.exists(os.path.join(search_path, lib_name)):
+                    libpq_found = True
+                    if lib_name.replace(".lib", "") not in available_libs:
+                        available_libs.append(lib_name.replace(".lib", ""))
+                    print("Found libpq: {} in {}".format(lib_name, search_path))
+                    break
+            if libpq_found:
+                break
+        
+        # Configure linking based on what's available
+        if libpqxx_found and libpq_found:
+            # Ideal case - both libraries available
+            env.Append(LIBS=available_libs + ["ws2_32", "advapi32"])
+            print("Using full PostgreSQL C++ support with libpqxx")
+        elif libpq_found:
+            # Fallback - only C library available, we'll need to implement C wrapper
+            env.Append(LIBS=["libpq", "ws2_32", "advapi32"])
+            env.Append(CPPDEFINES=["LIBPQXX_NOT_AVAILABLE"])
+            print("WARNING: libpqxx not found, using libpq only")
+            print("This may require code modifications to work with C API directly")
+        else:
+            # Last resort - try standard names and hope for the best
+            env.Append(LIBS=["libpqxx", "libpq", "ws2_32", "advapi32"])
+            print("WARNING: Libraries not found at expected locations")
+            print("Available library search paths:")
+            for path in lib_search_paths:
+                if os.path.exists(path):
+                    print("  {}:".format(path))
+                    try:
+                        for f in os.listdir(path):
+                            if f.endswith('.lib') and ('pq' in f.lower() or 'ssl' in f.lower()):
+                                print("    {}".format(f))
+                    except Exception:
+                        pass
+            print("Attempting build with standard library names...")
         
         # Store bundle flag for later use
         env["bundle_deps"] = bundle_deps
