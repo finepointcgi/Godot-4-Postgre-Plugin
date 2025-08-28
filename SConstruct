@@ -350,15 +350,15 @@ def copy_windows_dependencies(env, target):
                 target_path = os.path.join(target_dir, dll)
                 try:
                     shutil.copy2(dll_path, target_path)
-                    print("  ✓ Copied required: {} -> {}".format(dll, os.path.basename(target_path)))
+                    print("  [OK] Copied required: {} -> {}".format(dll, os.path.basename(target_path)))
                     copied_dlls.append(dll)
                     found = True
                     break
                 except Exception as e:
-                    print("  ✗ Failed to copy {}: {}".format(dll, e))
+                    print("  [ERROR] Failed to copy {}: {}".format(dll, e))
         
         if not found:
-            print("  ✗ Required DLL not found: {}".format(dll))
+            print("  [MISSING] Required DLL not found: {}".format(dll))
             missing_required.append(dll)
     
     # Copy high priority optional DLLs (pqxx)
@@ -370,11 +370,11 @@ def copy_windows_dependencies(env, target):
                     target_path = os.path.join(target_dir, dll)
                     try:
                         shutil.copy2(dll_path, target_path)
-                        print("  ✓ Copied C++ wrapper: {} -> {}".format(dll, os.path.basename(target_path)))
+                        print("  [OK] Copied C++ wrapper: {} -> {}".format(dll, os.path.basename(target_path)))
                         copied_dlls.append(dll)
                         break
                     except Exception as e:
-                        print("  ✗ Failed to copy {}: {}".format(dll, e))
+                        print("  [ERROR] Failed to copy {}: {}".format(dll, e))
     
     # Copy SSL libraries (try to get at least one crypto and one SSL)
     crypto_found = False
@@ -387,7 +387,7 @@ def copy_windows_dependencies(env, target):
                     target_path = os.path.join(target_dir, dll)
                     try:
                         shutil.copy2(dll_path, target_path)
-                        print("  ✓ Copied SSL/crypto: {} -> {}".format(dll, os.path.basename(target_path)))
+                        print("  [OK] Copied SSL/crypto: {} -> {}".format(dll, os.path.basename(target_path)))
                         copied_dlls.append(dll)
                         if "crypto" in dll.lower():
                             crypto_found = True
@@ -395,7 +395,7 @@ def copy_windows_dependencies(env, target):
                             ssl_found = True
                         break
                     except Exception as e:
-                        print("  ✗ Failed to copy {}: {}".format(dll, e))
+                        print("  [ERROR] Failed to copy {}: {}".format(dll, e))
     
     # Copy runtime libraries if needed
     runtime_copied = False
@@ -407,24 +407,24 @@ def copy_windows_dependencies(env, target):
                     target_path = os.path.join(target_dir, dll)
                     try:
                         shutil.copy2(dll_path, target_path)
-                        print("  ✓ Copied runtime: {} -> {}".format(dll, os.path.basename(target_path)))
+                        print("  [OK] Copied runtime: {} -> {}".format(dll, os.path.basename(target_path)))
                         copied_dlls.append(dll)
                         if "msvcp" in dll or "vcruntime" in dll:
                             runtime_copied = True
                         break
                     except Exception as e:
-                        print("  ✗ Failed to copy {}: {}".format(dll, e))
+                        print("  [ERROR] Failed to copy {}: {}".format(dll, e))
     
     # Summary
     print("\nDependency bundling summary:")
     print("  Copied {} DLLs: {}".format(len(copied_dlls), ", ".join(copied_dlls)))
     
     if missing_required:
-        print("  ✗ Missing required: {}".format(", ".join(missing_required)))
+        print("  [MISSING] Missing required: {}".format(", ".join(missing_required)))
     if not crypto_found:
-        print("  ⚠ Warning: No crypto library found")
+        print("  [WARNING] No crypto library found")
     if not ssl_found:
-        print("  ⚠ Warning: No SSL library found")
+        print("  [WARNING] No SSL library found")
     
     # Show final directory contents
     try:
