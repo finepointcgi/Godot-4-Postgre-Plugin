@@ -255,26 +255,35 @@ def copy_windows_dependencies(env, target):
     
     # Comprehensive list of required DLLs for distribution
     required_dlls = [
-        "libpq.dll",           # PostgreSQL client library
+        "libpq.dll",           # PostgreSQL client library (REQUIRED)
+        "pqxx.dll",            # libpqxx C++ wrapper (REQUIRED for C++ code)
     ]
     
-    # High priority optional DLLs (try these first)
-    high_priority_dlls = [
-        "pqxx.dll",            # libpqxx C++ wrapper
+    # Alternative names for required DLLs (try if main names not found)
+    required_alt_dlls = [
         "libpqxx.dll",         # libpqxx C++ wrapper (alternative name)
+        "pq.dll",              # PostgreSQL client (alternative name)
     ]
     
-    # SSL/Crypto libraries (try multiple versions)
+    # SSL/Crypto libraries (REQUIRED for secure connections)
     ssl_dlls = [
-        "libcrypto-3-x64.dll", # OpenSSL crypto (v3.x, 64-bit)
-        "libssl-3-x64.dll",    # OpenSSL SSL (v3.x, 64-bit)
+        "libcrypto-3-x64.dll", # OpenSSL crypto (v3.x, 64-bit) - preferred
+        "libssl-3-x64.dll",    # OpenSSL SSL (v3.x, 64-bit) - preferred
         "libcrypto-1_1-x64.dll", # OpenSSL crypto (v1.1.x, 64-bit)
         "libssl-1_1-x64.dll",    # OpenSSL SSL (v1.1.x, 64-bit)
         "libeay32.dll",        # OpenSSL crypto (legacy)
         "ssleay32.dll",        # OpenSSL SSL (legacy)
     ]
     
-    # Visual C++ runtime libraries
+    # Additional PostgreSQL dependencies that may be needed
+    postgres_support_dlls = [
+        "libiconv-2.dll",      # Character encoding conversion
+        "libintl-8.dll",       # Internationalization
+        "zlib1.dll",           # Compression library
+        "libwinpthread-1.dll", # Threading support
+    ]
+    
+    # Visual C++ runtime libraries (may be needed)
     runtime_dlls = [
         "msvcp140.dll",        # Visual C++ 2015-2022 runtime (C++)
         "vcruntime140.dll",    # Visual C++ 2015-2022 runtime
@@ -284,7 +293,7 @@ def copy_windows_dependencies(env, target):
     ]
     
     # Combine all DLLs to search for
-    optional_dlls = high_priority_dlls + ssl_dlls + runtime_dlls
+    optional_dlls = required_alt_dlls + ssl_dlls + postgres_support_dlls + runtime_dlls
     
     print("Copying Windows dependencies to: {}".format(target_dir))
     
@@ -341,40 +350,30 @@ def copy_windows_dependencies(env, target):
     copied_dlls = []
     missing_required = []
     
-    # Copy required DLLs first
-    for dll in required_dlls:
-        found = False
-        for search_path in search_paths:
-            dll_path = os.path.join(search_path, dll)
-            if os.path.exists(dll_path):
-                target_path = os.path.join(target_dir, dll)
-                try:
-                    shutil.copy2(dll_path, target_path)
-                    print("  [OK] Copied required: {} -> {}".format(dll, os.path.basename(target_path)))
-                    copied_dlls.append(dll)
-                    found = True
-                    break
-                except Exception as e:
-                    print("  [ERROR] Failed to copy {}: {}".format(dll, e))
-        
-        if not found:
-            print("  [MISSING] Required DLL not found: {}".format(dll))
-            missing_required.append(dll)
-    
-    # Copy high priority optional DLLs (pqxx)
-    for dll in high_priority_dlls:
+    # Copy required DLLs first (including alternatives)
+    all_required = required_dlls + required_alt_dlls
+    for dll in all_required:
         if dll not in copied_dlls:
+            found = False
             for search_path in search_paths:
                 dll_path = os.path.join(search_path, dll)
                 if os.path.exists(dll_path):
                     target_path = os.path.join(target_dir, dll)
                     try:
                         shutil.copy2(dll_path, target_path)
-                        print("  [OK] Copied C++ wrapper: {} -> {}".format(dll, os.path.basename(target_path)))
+                        if dll in required_dlls:
+                            print("  [OK] Copied required: {} -> {}".format(dll, os.path.basename(target_path)))
+                        else:
+                            print("  [OK] Copied alternative: {} -> {}".format(dll, os.path.basename(target_path)))
                         copied_dlls.append(dll)
+                        found = True
                         break
                     except Exception as e:
                         print("  [ERROR] Failed to copy {}: {}".format(dll, e))
+            
+            if not found and dll in required_dlls:
+                print("  [MISSING] Required DLL not found: {}".format(dll))
+                missing_required.append(dll)
     
     # Copy SSL libraries (try to get at least one crypto and one SSL)
     crypto_found = False
@@ -470,14 +469,21 @@ def bundle_macos_dependencies(env, target):
     # Required libraries
     required_libs = ["libpqxx", "libpq", "libssl", "libcrypto"]
     
-    for lib in required_libs:
+    # Additional support libraries that may be needed on macOS
+    support_libs = ["libiconv", "libintl", "libz"]
+    
+    # Copy all required and support libraries
+    all_libs = required_libs + support_libs
+    for lib in all_libs:
         # Search for dylib - more comprehensive search
         search_paths = [
             os.path.join(homebrew_prefix, "opt", "libpqxx", "lib"),
             os.path.join(homebrew_prefix, "opt", "libpq", "lib"),
             os.path.join(homebrew_prefix, "opt", "openssl@3", "lib"),  # OpenSSL 3.x
-            os.path.join(homebrew_prefix, "opt", "openssl@1.1", "lib"), # OpenSSL 1.1.x  
+            os.path.join(homebrew_prefix, "opt", "openssl@1.1", "lib"), # OpenSSL 1.1.x
             os.path.join(homebrew_prefix, "opt", "openssl", "lib"),    # Generic OpenSSL
+            os.path.join(homebrew_prefix, "opt", "gettext", "lib"),   # For libintl
+            os.path.join(homebrew_prefix, "opt", "libiconv", "lib"),  # For libiconv
             os.path.join(homebrew_prefix, "lib"),
             "/usr/lib",  # System libraries fallback
         ]
@@ -492,13 +498,18 @@ def bundle_macos_dependencies(env, target):
             import glob
             versioned = glob.glob(os.path.join(search_path, lib + ".*.dylib"))
             if versioned:
+                # Sort to get the highest version
+                versioned.sort(reverse=True)
                 dylib_path = versioned[0]
                 break
         
         if dylib_path:
             dest_path = os.path.join(libs_dir, os.path.basename(dylib_path))
             shutil.copy2(dylib_path, dest_path)
-            print("  Copied: {}".format(os.path.basename(dylib_path)))
+            if lib in required_libs:
+                print("  Copied required: {}".format(os.path.basename(dylib_path)))
+            else:
+                print("  Copied support: {}".format(os.path.basename(dylib_path)))
             
             # Update install names
             try:
@@ -533,8 +544,11 @@ def bundle_linux_dependencies(env, target):
     libs_dir = os.path.join(target_dir, "libs")
     os.makedirs(libs_dir, exist_ok=True)
     
-    # Required libraries
+    # Required libraries with comprehensive coverage
     required_libs = ["libpqxx", "libpq", "libssl", "libcrypto"]
+    
+    # Additional support libraries that may be needed
+    support_libs = ["libiconv", "libintl", "libz", "libgssapi_krb5", "libkrb5", "libk5crypto"]
     
     # Get library directories from pkg-config
     try:
@@ -566,16 +580,20 @@ def bundle_linux_dependencies(env, target):
         "/usr/local/lib",  # Common for manually installed libraries
     ]
     
-    for lib in required_libs:
+    # Copy all required and support libraries
+    all_libs = required_libs + support_libs
+    for lib in all_libs:
         so_path = None
         for search_path in search_paths:
             candidate = os.path.join(search_path, lib + ".so")
             if os.path.exists(candidate):
                 so_path = candidate
                 break
-            # Check for versioned libraries  
+            # Check for versioned libraries
             versioned = glob.glob(os.path.join(search_path, lib + ".so.*"))
             if versioned:
+                # Sort to get the highest version
+                versioned.sort(reverse=True)
                 so_path = versioned[0]
                 break
         
@@ -583,7 +601,10 @@ def bundle_linux_dependencies(env, target):
             dest_path = os.path.join(libs_dir, os.path.basename(so_path))
             shutil.copy2(so_path, dest_path)
             os.chmod(dest_path, 0o755)
-            print("  Copied: {}".format(os.path.basename(so_path)))
+            if lib in required_libs:
+                print("  Copied required: {}".format(os.path.basename(so_path)))
+            else:
+                print("  Copied support: {}".format(os.path.basename(so_path)))
         elif lib in ["libpqxx", "libpq"]:
             print("  Warning: Required library not found: {}".format(lib))
 
