@@ -256,42 +256,93 @@ def copy_windows_dependencies(env, target):
     # Comprehensive list of required DLLs for distribution
     required_dlls = [
         "libpq.dll",           # PostgreSQL client library
-        "libcrypto-3-x64.dll", # OpenSSL crypto (newer naming)
-        "libssl-3-x64.dll",    # OpenSSL SSL (newer naming)
     ]
-    optional_dlls = [
+    
+    # High priority optional DLLs (try these first)
+    high_priority_dlls = [
         "pqxx.dll",            # libpqxx C++ wrapper
-        "libcrypto-1_1-x64.dll",  # OpenSSL crypto (older naming)
-        "libssl-1_1-x64.dll",     # OpenSSL SSL (older naming)
-        "libeay32.dll",        # OpenSSL crypto (legacy naming)
-        "ssleay32.dll",        # OpenSSL SSL (legacy naming)
-        "msvcr120.dll",        # Visual C++ runtime (sometimes needed)
-        "msvcp120.dll",        # Visual C++ runtime (sometimes needed)
+        "libpqxx.dll",         # libpqxx C++ wrapper (alternative name)
     ]
+    
+    # SSL/Crypto libraries (try multiple versions)
+    ssl_dlls = [
+        "libcrypto-3-x64.dll", # OpenSSL crypto (v3.x, 64-bit)
+        "libssl-3-x64.dll",    # OpenSSL SSL (v3.x, 64-bit)
+        "libcrypto-1_1-x64.dll", # OpenSSL crypto (v1.1.x, 64-bit)
+        "libssl-1_1-x64.dll",    # OpenSSL SSL (v1.1.x, 64-bit)
+        "libeay32.dll",        # OpenSSL crypto (legacy)
+        "ssleay32.dll",        # OpenSSL SSL (legacy)
+    ]
+    
+    # Visual C++ runtime libraries
+    runtime_dlls = [
+        "msvcp140.dll",        # Visual C++ 2015-2022 runtime (C++)
+        "vcruntime140.dll",    # Visual C++ 2015-2022 runtime
+        "vcruntime140_1.dll",  # Visual C++ 2015-2022 runtime (additional)
+        "msvcp120.dll",        # Visual C++ 2013 runtime (C++)
+        "msvcr120.dll",        # Visual C++ 2013 runtime
+    ]
+    
+    # Combine all DLLs to search for
+    optional_dlls = high_priority_dlls + ssl_dlls + runtime_dlls
     
     print("Copying Windows dependencies to: {}".format(target_dir))
     
     # Search locations for DLLs (comprehensive search)
     search_paths = []
-    if vcpkg_root:
-        search_paths.append(os.path.join(vcpkg_root, "installed", "x64-windows", "bin"))
-        search_paths.append(os.path.join(vcpkg_root, "installed", "x64-windows", "lib"))
+    
+    # vcpkg paths (highest priority)
+    if vcpkg_root and os.path.exists(vcpkg_root):
+        vcpkg_bin = os.path.join(vcpkg_root, "installed", "x64-windows", "bin")
+        vcpkg_lib = os.path.join(vcpkg_root, "installed", "x64-windows", "lib")
+        if os.path.exists(vcpkg_bin):
+            search_paths.append(vcpkg_bin)
+        if os.path.exists(vcpkg_lib):
+            search_paths.append(vcpkg_lib)
     
     # PostgreSQL installation paths
-    search_paths.extend([
-        os.path.join(pg_path, "bin"),
-        os.path.join(pg_path, "lib")
-    ])
+    if os.path.exists(pg_path):
+        pg_bin = os.path.join(pg_path, "bin")
+        pg_lib = os.path.join(pg_path, "lib")
+        if os.path.exists(pg_bin):
+            search_paths.append(pg_bin)
+        if os.path.exists(pg_lib):
+            search_paths.append(pg_lib)
     
-    # System paths (for OpenSSL and runtime DLLs)
-    search_paths.extend([
+    # Additional PostgreSQL installation locations
+    for pg_version in ["16", "15", "14", "13", "12"]:
+        pg_alt_path = "C:\\Program Files\\PostgreSQL\\{}".format(pg_version)
+        if os.path.exists(pg_alt_path):
+            search_paths.extend([
+                os.path.join(pg_alt_path, "bin"),
+                os.path.join(pg_alt_path, "lib")
+            ])
+    
+    # System paths for OpenSSL and runtime DLLs
+    system_paths = [
         "C:\\Windows\\System32",
-        "C:\\Windows\\SysWOW64",
         os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "OpenSSL-Win64", "bin"),
-        os.path.join(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"), "OpenSSL-Win32", "bin")
-    ])
+        os.path.join(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"), "OpenSSL-Win32", "bin"),
+        os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "OpenSSL", "bin"),
+    ]
     
-    for dll in required_dlls + optional_dlls:
+    # Add system paths that exist
+    for sys_path in system_paths:
+        if os.path.exists(sys_path):
+            search_paths.append(sys_path)
+    
+    print("Searching for dependencies in {} locations:".format(len(search_paths)))
+    for i, path in enumerate(search_paths[:5]):  # Show first 5 paths
+        print("  {}: {}".format(i+1, path))
+    if len(search_paths) > 5:
+        print("  ... and {} more locations".format(len(search_paths) - 5))
+    
+    # Track what we copy
+    copied_dlls = []
+    missing_required = []
+    
+    # Copy required DLLs first
+    for dll in required_dlls:
         found = False
         for search_path in search_paths:
             dll_path = os.path.join(search_path, dll)
@@ -299,14 +350,88 @@ def copy_windows_dependencies(env, target):
                 target_path = os.path.join(target_dir, dll)
                 try:
                     shutil.copy2(dll_path, target_path)
-                    print("  Copied: {} -> {}".format(dll, os.path.basename(target_path)))
+                    print("  ✓ Copied required: {} -> {}".format(dll, os.path.basename(target_path)))
+                    copied_dlls.append(dll)
                     found = True
                     break
                 except Exception as e:
-                    print("  Warning: Failed to copy {}: {}".format(dll, e))
+                    print("  ✗ Failed to copy {}: {}".format(dll, e))
         
-        if not found and dll in required_dlls:
-            print("  Warning: Required DLL not found: {}".format(dll))
+        if not found:
+            print("  ✗ Required DLL not found: {}".format(dll))
+            missing_required.append(dll)
+    
+    # Copy high priority optional DLLs (pqxx)
+    for dll in high_priority_dlls:
+        if dll not in copied_dlls:
+            for search_path in search_paths:
+                dll_path = os.path.join(search_path, dll)
+                if os.path.exists(dll_path):
+                    target_path = os.path.join(target_dir, dll)
+                    try:
+                        shutil.copy2(dll_path, target_path)
+                        print("  ✓ Copied C++ wrapper: {} -> {}".format(dll, os.path.basename(target_path)))
+                        copied_dlls.append(dll)
+                        break
+                    except Exception as e:
+                        print("  ✗ Failed to copy {}: {}".format(dll, e))
+    
+    # Copy SSL libraries (try to get at least one crypto and one SSL)
+    crypto_found = False
+    ssl_found = False
+    for dll in ssl_dlls:
+        if dll not in copied_dlls:
+            for search_path in search_paths:
+                dll_path = os.path.join(search_path, dll)
+                if os.path.exists(dll_path):
+                    target_path = os.path.join(target_dir, dll)
+                    try:
+                        shutil.copy2(dll_path, target_path)
+                        print("  ✓ Copied SSL/crypto: {} -> {}".format(dll, os.path.basename(target_path)))
+                        copied_dlls.append(dll)
+                        if "crypto" in dll.lower():
+                            crypto_found = True
+                        if "ssl" in dll.lower():
+                            ssl_found = True
+                        break
+                    except Exception as e:
+                        print("  ✗ Failed to copy {}: {}".format(dll, e))
+    
+    # Copy runtime libraries if needed
+    runtime_copied = False
+    for dll in runtime_dlls:
+        if dll not in copied_dlls and not runtime_copied:
+            for search_path in search_paths:
+                dll_path = os.path.join(search_path, dll)
+                if os.path.exists(dll_path):
+                    target_path = os.path.join(target_dir, dll)
+                    try:
+                        shutil.copy2(dll_path, target_path)
+                        print("  ✓ Copied runtime: {} -> {}".format(dll, os.path.basename(target_path)))
+                        copied_dlls.append(dll)
+                        if "msvcp" in dll or "vcruntime" in dll:
+                            runtime_copied = True
+                        break
+                    except Exception as e:
+                        print("  ✗ Failed to copy {}: {}".format(dll, e))
+    
+    # Summary
+    print("\nDependency bundling summary:")
+    print("  Copied {} DLLs: {}".format(len(copied_dlls), ", ".join(copied_dlls)))
+    
+    if missing_required:
+        print("  ✗ Missing required: {}".format(", ".join(missing_required)))
+    if not crypto_found:
+        print("  ⚠ Warning: No crypto library found")
+    if not ssl_found:
+        print("  ⚠ Warning: No SSL library found")
+    
+    # Show final directory contents
+    try:
+        dll_files = [f for f in os.listdir(target_dir) if f.endswith('.dll')]
+        print("  Final plugin directory contains {} DLL files".format(len(dll_files)))
+    except Exception:
+        pass
 
 # Function to bundle dependencies for macOS frameworks
 def bundle_macos_dependencies(env, target):
