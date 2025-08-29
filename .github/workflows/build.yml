@@ -214,7 +214,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [universal]
+        arch: [arm64]
         target: [template_debug, template_release]
     
     steps:

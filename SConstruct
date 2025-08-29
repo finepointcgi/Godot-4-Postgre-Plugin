@@ -44,16 +44,26 @@ def configure_postgresql_libs(env):
                 lipo_output = subprocess.check_output(["lipo", "-info", libpqxx_path], universal_newlines=True)
                 print("libpqxx architecture: {}".format(lipo_output.strip()))
                 
-                # If building universal but library is single-arch, adjust build
-                if build_arch == "universal" and "Non-fat file" in lipo_output:
-                    if "arm64" in lipo_output:
-                        print("Homebrew libraries are ARM64-only, switching to arm64 build")
-                        env["arch"] = "arm64"
-                    elif "x86_64" in lipo_output:
-                        print("Homebrew libraries are x86_64-only, switching to x86_64 build")
-                        env["arch"] = "x86_64"
+                # Always use the architecture that matches available libraries
+                if "arm64" in lipo_output and "x86_64" not in lipo_output:
+                    print("Homebrew libraries are ARM64-only, forcing arm64 build")
+                    env["arch"] = "arm64"
+                elif "x86_64" in lipo_output and "arm64" not in lipo_output:
+                    print("Homebrew libraries are x86_64-only, forcing x86_64 build")
+                    env["arch"] = "x86_64"
+                elif build_arch == "universal" and "arm64" in lipo_output and "x86_64" in lipo_output:
+                    print("Libraries support universal build, keeping universal")
+                else:
+                    # Default to native architecture if uncertain
+                    import platform
+                    native_arch = "arm64" if platform.machine() == "arm64" else "x86_64"
+                    print("Using native architecture: {}".format(native_arch))
+                    env["arch"] = native_arch
             except (subprocess.CalledProcessError, OSError):
-                print("Could not check library architecture, proceeding with requested arch")
+                print("Could not check library architecture, using native arch")
+                import platform
+                native_arch = "arm64" if platform.machine() == "arm64" else "x86_64"
+                env["arch"] = native_arch
         
         env.Append(CPPPATH=[
             os.path.join(homebrew_prefix, "opt", "libpqxx", "include"),
