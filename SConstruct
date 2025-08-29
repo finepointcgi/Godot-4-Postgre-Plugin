@@ -74,24 +74,52 @@ def configure_postgresql_libs(env):
             os.path.join(homebrew_prefix, "opt", "libpq", "lib")
         ])
         
-        # Configure linking method
-        if bundle_deps and bundle_method == "static":
-            # Try static linking first
+        # Configure linking method - prefer static for self-contained builds
+        bundle_method = os.environ.get("BUNDLE_METHOD", "static")
+        
+        if bundle_method == "static":
+            # Try static linking first for self-contained framework
             static_libs = [
                 os.path.join(homebrew_prefix, "opt", "libpqxx", "lib", "libpqxx.a"),
                 os.path.join(homebrew_prefix, "opt", "libpq", "lib", "libpq.a")
             ]
+            
+            # Also check for OpenSSL static libraries
+            ssl_static_libs = [
+                os.path.join(homebrew_prefix, "opt", "openssl@3", "lib", "libssl.a"),
+                os.path.join(homebrew_prefix, "opt", "openssl@3", "lib", "libcrypto.a"),
+                os.path.join(homebrew_prefix, "opt", "openssl@1.1", "lib", "libssl.a"),
+                os.path.join(homebrew_prefix, "opt", "openssl@1.1", "lib", "libcrypto.a"),
+                os.path.join(homebrew_prefix, "opt", "openssl", "lib", "libssl.a"),
+                os.path.join(homebrew_prefix, "opt", "openssl", "lib", "libcrypto.a")
+            ]
+            
+            found_ssl_static = any(os.path.exists(lib) for lib in ssl_static_libs)
+            
             if all(os.path.exists(lib) for lib in static_libs):
                 env.Append(LIBS=["pqxx", "pq"])
-                env.Append(LINKFLAGS=["-static-libstdc++"])
-                print("Using static linking for macOS")
+                
+                # Add SSL libraries if available statically
+                if found_ssl_static:
+                    env.Append(LIBS=["ssl", "crypto"])
+                    print("Using static linking for macOS (including SSL)")
+                else:
+                    print("Using static linking for macOS (PostgreSQL only, SSL will be dynamic)")
+                
+                # Additional system libraries needed for static PostgreSQL
+                env.Append(LIBS=["iconv", "intl"])
+                env.Append(LINKFLAGS=["-static-libstdc++", "-static-libgcc"])
+                bundle_deps = False  # No bundling needed with static linking
+                
             else:
                 print("Static libraries not found, falling back to dynamic linking")
                 bundle_method = "dynamic"
+                bundle_deps = True
         
-        if not bundle_deps or bundle_method != "static":
+        if bundle_method != "static":
             # Dynamic linking - will be bundled post-build
             env.Append(LIBS=["pqxx", "pq"])
+            bundle_deps = True
         
         # Store bundle settings for post-build actions
         env["bundle_deps"] = bundle_deps
@@ -155,15 +183,16 @@ def configure_postgresql_libs(env):
         env["bundle_method"] = bundle_method
             
     elif platform == "windows":
-        # Windows - Always use dynamic linking and bundle DLLs for user distribution
+        # Windows - Prefer static linking for self-contained DLL
         pg_path = os.environ.get("POSTGRESQL_PATH", "C:\\Program Files\\PostgreSQL\\16")
         vcpkg_root = os.environ.get("VCPKG_ROOT", "")
+        bundle_method = os.environ.get("BUNDLE_METHOD", "static")
         
-        # Force DLL bundling for end-user distribution
-        bundle_deps = True
-        print("Windows build: Always bundling dependencies for end-user distribution")
+        bundle_deps = bundle_method != "static"
+        print("Windows build: Attempting static linking for self-contained DLL")
         print("PostgreSQL path: {}".format(pg_path))
         print("vcpkg root: {}".format(vcpkg_root))
+        print("Bundle method: {}".format(bundle_method))
         
         env.Append(CPPPATH=[
             os.path.join(pg_path, "include")
@@ -182,63 +211,108 @@ def configure_postgresql_libs(env):
             env.Append(CPPPATH=[vcpkg_inc_path])
             env.Append(LIBPATH=[vcpkg_lib_path])
             lib_search_paths.append(vcpkg_lib_path)
-            print("Using vcpkg dynamic linking with DLL bundling")
+            
+            if bundle_method == "static":
+                print("Using vcpkg static linking")
+            else:
+                print("Using vcpkg dynamic linking with DLL bundling")
         
         # Add PostgreSQL paths
         pg_lib_path = os.path.join(pg_path, "lib")
         lib_search_paths.append(pg_lib_path)
         
-        # Check for libpqxx availability (C++ wrapper)
+        # Check for libpqxx availability (C++ wrapper) - prefer static
         libpqxx_found = False
+        static_libs_found = []
+        
         for search_path in lib_search_paths:
-            for lib_name in ["pqxx.lib", "libpqxx.lib", "pqxx_static.lib", "libpqxx_static.lib"]:
-                if os.path.exists(os.path.join(search_path, lib_name)):
+            # Try static libraries first if static linking requested
+            if bundle_method == "static":
+                static_candidates = ["pqxx_static.lib", "libpqxx_static.lib", "pqxx.lib", "libpqxx.lib"]
+            else:
+                static_candidates = ["pqxx.lib", "libpqxx.lib", "pqxx_static.lib", "libpqxx_static.lib"]
+                
+            for lib_name in static_candidates:
+                lib_path = os.path.join(search_path, lib_name)
+                if os.path.exists(lib_path):
                     libpqxx_found = True
-                    available_libs.append(lib_name.replace(".lib", ""))
-                    print("Found libpqxx: {} in {}".format(lib_name, search_path))
+                    lib_clean_name = lib_name.replace("_static", "").replace(".lib", "")
+                    if lib_clean_name not in available_libs:
+                        available_libs.append(lib_clean_name)
+                    
+                    is_static = "_static" in lib_name or (bundle_method == "static" and "pqxx" in lib_name)
+                    print("Found libpqxx: {} in {} [{}]".format(lib_name, search_path, "static" if is_static else "dynamic"))
+                    
+                    if is_static:
+                        static_libs_found.append(lib_name)
                     break
             if libpqxx_found:
                 break
         
-        # Check for libpq availability (C client)
+        # Check for libpq availability (C client) - prefer static
         libpq_found = False
         for search_path in lib_search_paths:
-            for lib_name in ["libpq.lib", "pq.lib"]:
-                if os.path.exists(os.path.join(search_path, lib_name)):
+            if bundle_method == "static":
+                pq_candidates = ["libpq_static.lib", "pq_static.lib", "libpq.lib", "pq.lib"]
+            else:
+                pq_candidates = ["libpq.lib", "pq.lib", "libpq_static.lib", "pq_static.lib"]
+                
+            for lib_name in pq_candidates:
+                lib_path = os.path.join(search_path, lib_name)
+                if os.path.exists(lib_path):
                     libpq_found = True
-                    if lib_name.replace(".lib", "") not in available_libs:
-                        available_libs.append(lib_name.replace(".lib", ""))
-                    print("Found libpq: {} in {}".format(lib_name, search_path))
+                    lib_clean_name = lib_name.replace("_static", "").replace(".lib", "")
+                    if lib_clean_name not in available_libs:
+                        available_libs.append(lib_clean_name)
+                    
+                    is_static = "_static" in lib_name or (bundle_method == "static" and "pq" in lib_name)
+                    print("Found libpq: {} in {} [{}]".format(lib_name, search_path, "static" if is_static else "dynamic"))
+                    
+                    if is_static:
+                        static_libs_found.append(lib_name)
                     break
             if libpq_found:
                 break
         
         # Configure linking based on what's available
         if libpqxx_found and libpq_found:
-            # Ideal case - both libraries available
-            env.Append(LIBS=available_libs + ["ws2_32", "advapi32"])
-            print("Using full PostgreSQL C++ support with libpqxx")
+            # Configure static vs dynamic linking
+            if bundle_method == "static" and static_libs_found:
+                # Static linking - add additional Windows libraries needed for static PostgreSQL
+                static_system_libs = [
+                    "ws2_32", "advapi32", "secur32", "shell32", "wldap32", "crypt32",
+                    "user32", "kernel32", "gdi32", "psapi", "bcrypt"
+                ]
+                
+                # Add OpenSSL static libraries if available
+                for search_path in lib_search_paths:
+                    ssl_static_libs = ["libssl_static.lib", "libcrypto_static.lib",
+                                     "ssl.lib", "crypto.lib"]
+                    for ssl_lib in ssl_static_libs:
+                        if os.path.exists(os.path.join(search_path, ssl_lib)):
+                            ssl_clean = ssl_lib.replace("_static", "").replace(".lib", "")
+                            if ssl_clean not in available_libs:
+                                available_libs.append(ssl_clean)
+                            print("Found SSL library: {} [static]".format(ssl_lib))
+                
+                env.Append(LIBS=available_libs + static_system_libs)
+                env.Append(CPPDEFINES=["PQXX_STATIC", "LIBPQ_STATIC"])
+                bundle_deps = False  # No need to bundle DLLs with static linking
+                print("Using static linking - self-contained DLL with no external dependencies")
+                
+            else:
+                # Dynamic linking fallback
+                env.Append(LIBS=available_libs + ["ws2_32", "advapi32"])
+                bundle_deps = True
+                print("Using dynamic linking - will bundle required DLLs")
+                
         elif libpq_found:
-            # Fallback - only C library available, we'll need to implement C wrapper
             env.Append(LIBS=["libpq", "ws2_32", "advapi32"])
             env.Append(CPPDEFINES=["LIBPQXX_NOT_AVAILABLE"])
             print("WARNING: libpqxx not found, using libpq only")
-            print("This may require code modifications to work with C API directly")
         else:
-            # Last resort - try standard names and hope for the best
             env.Append(LIBS=["libpqxx", "libpq", "ws2_32", "advapi32"])
-            print("WARNING: Libraries not found at expected locations")
-            print("Available library search paths:")
-            for path in lib_search_paths:
-                if os.path.exists(path):
-                    print("  {}:".format(path))
-                    try:
-                        for f in os.listdir(path):
-                            if f.endswith('.lib') and ('pq' in f.lower() or 'ssl' in f.lower()):
-                                print("    {}".format(f))
-                    except Exception:
-                        pass
-            print("Attempting build with standard library names...")
+            print("WARNING: Libraries not found, attempting build with standard names")
         
         # Store bundle flag for later use
         env["bundle_deps"] = bundle_deps
