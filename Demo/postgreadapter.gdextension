@@ -22,8 +22,18 @@ linux.release.arm64 = "bin/PostgreAdapter/libpostgreadapter.linux.template_relea
 macos.debug = {}
 macos.release = {}
 
-windows.debug.x86_64 = {}
-windows.release.x86_64 = {}
+windows.debug.x86_64 = {
+    "bin/PostgreAdapter/pqxx.dll" : "",
+    "bin/PostgreAdapter/libpq.dll" : "",
+    "bin/PostgreAdapter/libcrypto-3-x64.dll" : "",
+    "bin/PostgreAdapter/libssl-3-x64.dll" : ""
+}
+windows.release.x86_64 = {
+    "bin/PostgreAdapter/pqxx.dll" : "",
+    "bin/PostgreAdapter/libpq.dll" : "",
+    "bin/PostgreAdapter/libcrypto-3-x64.dll" : "",
+    "bin/PostgreAdapter/libssl-3-x64.dll" : ""
+}
 
 linux.debug.x86_64 = {}
 linux.release.x86_64 = {}

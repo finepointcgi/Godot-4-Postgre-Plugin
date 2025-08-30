@@ -19,6 +19,14 @@ env.Append(CPPPATH=[
 def configure_postgresql_libs(env):
     platform = env["platform"]
     
+    # PostgreSQL DLLs that need to be bundled with Windows builds
+    postgresql_dlls = [
+        "pqxx.dll",
+        "libpq.dll",
+        "libcrypto-3-x64.dll",
+        "libssl-3-x64.dll"
+    ]
+    
     if platform == "macos":
         # macOS with Homebrew
         homebrew_prefix = "/opt/homebrew"
@@ -71,6 +79,43 @@ def configure_postgresql_libs(env):
         
         # Windows library names for libpqxx and libpq
         env.Append(LIBS=["pqxx", "libpq", "ws2_32", "advapi32"])
+        
+        # Copy PostgreSQL DLLs to output directory
+        def copy_postgresql_dlls(target, source, env):
+            import shutil
+            
+            target_dir = os.path.dirname(str(target[0]))
+            print("Copying PostgreSQL DLLs to: {}".format(target_dir))
+            
+            # Search paths for DLLs
+            dll_search_paths = []
+            if vcpkg_root:
+                dll_search_paths.append(os.path.join(vcpkg_root, "installed", "x64-windows", "bin"))
+            dll_search_paths.extend([
+                os.path.join(pg_path, "bin"),
+                os.path.join(pg_path, "lib"),
+            ])
+            
+            for dll_name in postgresql_dlls:
+                dll_found = False
+                for search_path in dll_search_paths:
+                    dll_path = os.path.join(search_path, dll_name)
+                    if os.path.exists(dll_path):
+                        dst_path = os.path.join(target_dir, dll_name)
+                        try:
+                            shutil.copy2(dll_path, dst_path)
+                            print("Copied {} to {}".format(dll_path, dst_path))
+                            dll_found = True
+                            break
+                        except Exception as e:
+                            print("Failed to copy {}: {}".format(dll_path, e))
+                
+                if not dll_found:
+                    print("Warning: Could not find DLL: {} in search paths: {}".format(dll_name, dll_search_paths))
+        
+        # Register the DLL copy action
+        env.AddPostAction("$TARGET", copy_postgresql_dlls)
+        
         return  # Skip the common libs addition below
     
     # Common library names for Unix-like systems
