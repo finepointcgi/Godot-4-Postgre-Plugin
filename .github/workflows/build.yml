@@ -205,13 +205,13 @@ jobs:
         
         foreach ($dir in $outputDirs) {
           if (Test-Path $dir) {
-            Write-Host "Checking DLLs in $dir:"
+            Write-Host "Checking DLLs in ${dir}:"
             foreach ($dll in $requiredDlls) {
               $dllPath = Join-Path $dir $dll
               if (Test-Path $dllPath) {
-                Write-Host "  ✓ Found: $dll"
+                Write-Host "  Found: $dll"
               } else {
-                Write-Host "  ✗ Missing: $dll"
+                Write-Host "  Missing: $dll"
               }
             }
           }
