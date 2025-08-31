@@ -25,8 +25,21 @@ REM Define search paths
 set "SEARCH_PATHS="
 if defined VCPKG_ROOT (
     set "SEARCH_PATHS=!SEARCH_PATHS! "%VCPKG_ROOT%\installed\x64-windows\bin""
+    set "SEARCH_PATHS=!SEARCH_PATHS! "%VCPKG_ROOT%\installed\x64-windows\lib""
 )
 set "SEARCH_PATHS=!SEARCH_PATHS! "%POSTGRESQL_PATH%\bin" "%POSTGRESQL_PATH%\lib""
+
+REM Add common system paths for OpenSSL DLLs
+for %%P in (
+    "C:\Program Files\OpenSSL-Win64\bin"
+    "C:\OpenSSL-Win64\bin"
+    "C:\tools\vcpkg\installed\x64-windows\bin"
+    "%SystemRoot%\System32"
+) do (
+    if exist %%P (
+        set "SEARCH_PATHS=!SEARCH_PATHS! %%P"
+    )
+)
 
 REM Define output directories
 set "OUTPUT_DIRS=demo\bin\PostgreAdapter Demo\bin\PostgreAdapter"
@@ -64,12 +77,34 @@ for %%O in (%OUTPUT_DIRS%) do (
         :next_dll
         if not defined DLL_FOUND (
             echo   ⚠ Warning: Could not find %%D in any search path
+            echo      Searched in:
+            for %%P in (%SEARCH_PATHS%) do (
+                echo        - %%~P
+            )
         )
     )
 )
 
 echo.
 echo DLL copy process completed.
+echo.
+
+REM Final verification
+echo Performing final verification...
+for %%O in (%OUTPUT_DIRS%) do (
+    if exist "%%O" (
+        echo.
+        echo Contents of %%O:
+        for %%D in (%DLL_LIST%) do (
+            if exist "%%O\%%D" (
+                echo   ✓ %%D - Found
+            ) else (
+                echo   ✗ %%D - Missing
+            )
+        )
+    )
+)
+
 echo.
 echo Note: Make sure these DLLs are distributed alongside your GDExtension
 echo for proper runtime dependency resolution.
