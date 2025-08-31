@@ -196,8 +196,14 @@ jobs:
     - name: Copy PostgreSQL DLLs
       shell: powershell
       run: |
-        # Run the DLL copy script to ensure dependencies are bundled
-        .\build_scripts\copy_postgres_dlls.bat
+        # Run the enhanced DLL download script to ensure dependencies are bundled
+        .\build_scripts\download_postgres_dlls.ps1
+        
+        # Also copy to demo directory (lowercase)
+        if (Test-Path "Demo\bin\PostgreAdapter") {
+          Copy-Item "Demo\bin\PostgreAdapter\*" "demo\bin\PostgreAdapter\" -Force -ErrorAction SilentlyContinue
+          New-Item -Path "demo\bin\PostgreAdapter" -ItemType Directory -Force -ErrorAction SilentlyContinue
+        }
         
         # Verify DLLs were copied
         $requiredDlls = @("pqxx.dll", "libpq.dll", "libcrypto-3-x64.dll", "libssl-3-x64.dll")
@@ -209,7 +215,8 @@ jobs:
             foreach ($dll in $requiredDlls) {
               $dllPath = Join-Path $dir $dll
               if (Test-Path $dllPath) {
-                Write-Host "  Found: $dll"
+                $size = (Get-Item $dllPath).Length
+                Write-Host "  Found: $dll ($size bytes)"
               } else {
                 Write-Host "  Missing: $dll"
               }
