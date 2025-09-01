@@ -93,6 +93,20 @@ jobs:
         scons platform=linux target=${{ matrix.target }} arch=${{ matrix.arch }} \
               -j$(nproc)
 
+    - name: Copy PostgreSQL Libraries
+      run: |
+        # Run the library copy script to ensure dependencies are bundled
+        ./build_scripts/copy_postgres_libs.sh
+        
+        # Verify libraries were copied
+        echo "Verifying PostgreSQL libraries:"
+        for dir in "demo/bin/PostgreAdapter" "Demo/bin/PostgreAdapter"; do
+          if [ -d "$dir" ]; then
+            echo "Contents of $dir:"
+            ls -la "$dir"
+          fi
+        done
+
     - name: List build outputs
       run: |
         echo "Build outputs:"
@@ -104,6 +118,7 @@ jobs:
         name: linux-${{ matrix.arch }}-${{ matrix.target }}
         path: |
           demo/bin/PostgreAdapter/libpostgreadapter.linux.*.so
+          demo/bin/PostgreAdapter/*.so*
           demo/bin/postgreadapter.gdextension
         retention-days: 7
 
@@ -290,6 +305,20 @@ jobs:
         scons platform=macos target=${{ matrix.target }} arch=${{ matrix.arch }} \
               -j$(sysctl -n hw.ncpu)
 
+    - name: Copy PostgreSQL Libraries
+      run: |
+        # Run the library copy script to ensure dependencies are bundled
+        ./build_scripts/copy_postgres_libs.sh
+        
+        # Verify libraries were copied
+        echo "Verifying PostgreSQL libraries:"
+        for dir in "demo/bin/PostgreAdapter" "Demo/bin/PostgreAdapter"; do
+          if [ -d "$dir" ]; then
+            echo "Contents of $dir:"
+            ls -la "$dir"
+          fi
+        done
+
     - name: List build outputs
       run: |
         echo "Build outputs:"
@@ -301,6 +330,7 @@ jobs:
         name: macos-${{ matrix.arch }}-${{ matrix.target }}
         path: |
           demo/bin/PostgreAdapter/libpostgreadapter.macos.*.framework
+          demo/bin/PostgreAdapter/*.dylib*
           Demo/postgreadapter.gdextension
         retention-days: 7
 
@@ -331,15 +361,36 @@ jobs:
         # Copy binaries from artifacts to bin/PostgreAdapter/ structure
         find artifacts -name "*.so" -exec cp {} postgresql-gdextension/bin/PostgreAdapter/ \; 2>/dev/null || true
         find artifacts -name "*.dll" -exec cp {} postgresql-gdextension/bin/PostgreAdapter/ \; 2>/dev/null || true
+        find artifacts -name "*.dylib" -exec cp {} postgresql-gdextension/bin/PostgreAdapter/ \; 2>/dev/null || true
         find artifacts -name "*.framework" -exec cp -r {} postgresql-gdextension/bin/PostgreAdapter/ \; 2>/dev/null || true
         
-        # Ensure PostgreSQL DLLs are included in the package
-        echo "Verifying PostgreSQL DLLs in package:"
+        # Verify all platform dependencies are included
+        echo "Verifying platform dependencies in package:"
+        
+        # Windows DLLs
         for dll in "pqxx.dll" "libpq.dll" "libcrypto-3-x64.dll" "libssl-3-x64.dll"; do
           if find postgresql-gdextension/bin/PostgreAdapter/ -name "$dll" -type f | grep -q .; then
-            echo "  ✓ Found: $dll"
+            echo "  ✓ Found Windows: $dll"
           else
-            echo "  ✗ Missing: $dll"
+            echo "  ✗ Missing Windows: $dll"
+          fi
+        done
+        
+        # Linux shared objects
+        for so in "libpqxx.so" "libpq.so.5" "libssl.so.3" "libcrypto.so.3"; do
+          if find postgresql-gdextension/bin/PostgreAdapter/ -name "$so*" -type f | grep -q .; then
+            echo "  ✓ Found Linux: $so"
+          else
+            echo "  ✗ Missing Linux: $so"
+          fi
+        done
+        
+        # macOS dylibs
+        for dylib in "libpqxx.dylib" "libpq.5.dylib" "libssl.3.dylib" "libcrypto.3.dylib"; do
+          if find postgresql-gdextension/bin/PostgreAdapter/ -name "$dylib*" -type f | grep -q .; then
+            echo "  ✓ Found macOS: $dylib"
+          else
+            echo "  ✗ Missing macOS: $dylib"
           fi
         done
         
