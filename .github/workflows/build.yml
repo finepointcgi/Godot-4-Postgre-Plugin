@@ -95,6 +95,9 @@ jobs:
 
     - name: Copy PostgreSQL Libraries
       run: |
+        # Make script executable
+        chmod +x build_scripts/copy_postgres_libs.sh
+        
         # Run the library copy script to ensure dependencies are bundled
         ./build_scripts/copy_postgres_libs.sh
         
@@ -307,6 +310,9 @@ jobs:
 
     - name: Copy PostgreSQL Libraries
       run: |
+        # Make script executable
+        chmod +x build_scripts/copy_postgres_libs.sh
+        
         # Run the library copy script to ensure dependencies are bundled
         ./build_scripts/copy_postgres_libs.sh
         
